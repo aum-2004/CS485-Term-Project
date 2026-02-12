@@ -1,6 +1,7 @@
 # Development Specification: US2 - Moderator Debate Summaries
 
 ## Overview
+
 This document specifies the development of the Moderator Debate Summaries feature, enabling moderators to review thread-level debate quality and key positions at a glance for content triage and promotion decisions.
 
 **User Story**: As a moderator, I want thread-level debate summaries that outline main positions and the strongest reasoning on each side so that I can triage discussions for quality and policy concerns.
@@ -74,12 +75,14 @@ This document specifies the development of the Moderator Debate Summaries featur
 ```
 
 **Component Locations**:
+
 - **Client**: Browser-based React dashboard for moderators
 - **API Server**: Node.js/Express backend (AWS EC2 or similar)
 - **Database**: PostgreSQL (primary data store for threads, comments, summaries)
 - **Cache**: Redis (in-memory thread summaries cache, longer TTL than US1)
 
 **Information Flows**:
+
 1. Moderator navigates to thread and clicks "View Debate Summary"
 2. Client sends GET request to API with `threadId`
 3. API checks Redis cache first
@@ -155,23 +158,23 @@ This document specifies the development of the Moderator Debate Summaries featur
 
 ## List of Classes
 
-| Class Name | Package | Responsibility |
-|-----------|---------|-----------------|
-| `ThreadAnalysisService` | services | Orchestrates thread-level debate analysis and summary generation |
-| `DebateSummaryController` | controllers | HTTP endpoint handler for debate summary requests |
-| `PositionClusterer` | services | Groups similar claims/arguments into distinct positions |
-| `EvidenceExtractor` | services | Identifies and ranks supporting evidence per position |
-| `DisagreementAnalyzer` | services | Identifies where positions fundamentally disagree |
-| `DebateQualityScorer` | services | Computes overall debate quality metric |
-| `AIAnalysisService` | services | Shared AI service for claims/evidence extraction (from US1) |
-| `CacheService` | services | Shared Redis cache management (from US1) |
-| `DebateSummary` | models/dtos | Data Transfer Object for thread summary response |
-| `Position` | models | Represents a distinct perspective in the debate |
-| `EvidenceAnchor` | models | Linked evidence supporting a specific position |
-| `DisagreementArea` | models | Identifies key points of disagreement between positions |
-| `ThreadRepository` | repositories | Database access for thread metadata |
-| `CommentRepository` | repositories | Database access for thread comments |
-| `DebateSummaryRepository` | repositories | Database access for cached debate summaries |
+| Class Name                | Package      | Responsibility                                                   |
+| ------------------------- | ------------ | ---------------------------------------------------------------- |
+| `ThreadAnalysisService`   | services     | Orchestrates thread-level debate analysis and summary generation |
+| `DebateSummaryController` | controllers  | HTTP endpoint handler for debate summary requests                |
+| `PositionClusterer`       | services     | Groups similar claims/arguments into distinct positions          |
+| `EvidenceExtractor`       | services     | Identifies and ranks supporting evidence per position            |
+| `DisagreementAnalyzer`    | services     | Identifies where positions fundamentally disagree                |
+| `DebateQualityScorer`     | services     | Computes overall debate quality metric                           |
+| `AIAnalysisService`       | services     | Shared AI service for claims/evidence extraction (from US1)      |
+| `CacheService`            | services     | Shared Redis cache management (from US1)                         |
+| `DebateSummary`           | models/dtos  | Data Transfer Object for thread summary response                 |
+| `Position`                | models       | Represents a distinct perspective in the debate                  |
+| `EvidenceAnchor`          | models       | Linked evidence supporting a specific position                   |
+| `DisagreementArea`        | models       | Identifies key points of disagreement between positions          |
+| `ThreadRepository`        | repositories | Database access for thread metadata                              |
+| `CommentRepository`       | repositories | Database access for thread comments                              |
+| `DebateSummaryRepository` | repositories | Database access for cached debate summaries                      |
 
 ---
 
@@ -353,35 +356,35 @@ Client Sends: GET /api/v1/threads/{threadId}/debate-summary
 
 ## Development Risks and Failures
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|-----------|
-| **Large Thread Performance** | High | Timeout on threads with 1000+ comments | Process in batches, cache aggressively, consider async job queue |
-| **Position Clustering Accuracy** | Medium | Important positions missed or merged incorrectly | Tune similarity threshold, test with diverse datasets |
-| **Evidence Validation** | Medium | False or weak evidence marked as strong | Human review of top summaries, feedback loop |
-| **Scalability of Position Clustering** | Medium | O(n²) similarity calculations slow on large datasets | Use approximate similarity, dimensionality reduction, caching |
-| **Lack of Domain Context** | Medium | AI misses nuanced disagreements in specialized topics | Allow manual position editing by moderators, domain expertise input |
-| **Cache Invalidation** | Low | Edited comments show stale analysis | Invalidate cache on comment edit/delete, 48h expiration anyway |
-| **Competing Summary Generations** | Low | Multiple regenerate requests cause duplicate work | Implement generation lock/semaphore |
-| **Moderator Cognitive Overload** | Medium | Summary too complex or verbose | Limit to top 3-4 positions, keep text concise |
+| Risk                                   | Likelihood | Impact                                                | Mitigation                                                          |
+| -------------------------------------- | ---------- | ----------------------------------------------------- | ------------------------------------------------------------------- |
+| **Large Thread Performance**           | High       | Timeout on threads with 1000+ comments                | Process in batches, cache aggressively, consider async job queue    |
+| **Position Clustering Accuracy**       | Medium     | Important positions missed or merged incorrectly      | Tune similarity threshold, test with diverse datasets               |
+| **Evidence Validation**                | Medium     | False or weak evidence marked as strong               | Human review of top summaries, feedback loop                        |
+| **Scalability of Position Clustering** | Medium     | O(n²) similarity calculations slow on large datasets  | Use approximate similarity, dimensionality reduction, caching       |
+| **Lack of Domain Context**             | Medium     | AI misses nuanced disagreements in specialized topics | Allow manual position editing by moderators, domain expertise input |
+| **Cache Invalidation**                 | Low        | Edited comments show stale analysis                   | Invalidate cache on comment edit/delete, 48h expiration anyway      |
+| **Competing Summary Generations**      | Low        | Multiple regenerate requests cause duplicate work     | Implement generation lock/semaphore                                 |
+| **Moderator Cognitive Overload**       | Medium     | Summary too complex or verbose                        | Limit to top 3-4 positions, keep text concise                       |
 
 ---
 
 ## Technology Stack
 
-| Layer | Technology | Version | Purpose |
-|-------|-----------|---------|---------|
-| **Frontend** | React | 18.x | Moderator dashboard UI |
-| **Frontend** | TypeScript | 5.x | Type safety |
-| **Frontend** | Material-UI | 5.x | Pre-built moderator components |
-| **Backend** | Node.js | 18.x LTS | Runtime |
-| **Backend** | Express.js | 4.x | HTTP API framework |
-| **Backend** | TypeScript | 5.x | Type safety |
-| **AI Service** | OpenAI API | GPT-4 | Batch comment analysis |
-| **Database** | PostgreSQL | 14+ | Primary store |
-| **Cache** | Redis | 7.x | Summary cache (48h TTL) |
-| **ML/Clustering** | natural | Latest | Position clustering algorithm |
-| **Job Queue** | Bull | 4.x | Background summary generation |
-| **Testing** | Jest | 29.x | Unit and integration tests |
+| Layer             | Technology  | Version  | Purpose                        |
+| ----------------- | ----------- | -------- | ------------------------------ |
+| **Frontend**      | React       | 18.x     | Moderator dashboard UI         |
+| **Frontend**      | TypeScript  | 5.x      | Type safety                    |
+| **Frontend**      | Material-UI | 5.x      | Pre-built moderator components |
+| **Backend**       | Node.js     | 18.x LTS | Runtime                        |
+| **Backend**       | Express.js  | 4.x      | HTTP API framework             |
+| **Backend**       | TypeScript  | 5.x      | Type safety                    |
+| **AI Service**    | OpenAI API  | GPT-4    | Batch comment analysis         |
+| **Database**      | PostgreSQL  | 14+      | Primary store                  |
+| **Cache**         | Redis       | 7.x      | Summary cache (48h TTL)        |
+| **ML/Clustering** | natural     | Latest   | Position clustering algorithm  |
+| **Job Queue**     | Bull        | 4.x      | Background summary generation  |
+| **Testing**       | Jest        | 29.x     | Unit and integration tests     |
 
 ---
 
@@ -390,15 +393,18 @@ Client Sends: GET /api/v1/threads/{threadId}/debate-summary
 ### Public REST Endpoints
 
 #### 1. Get Thread Debate Summary
+
 ```http
 GET /api/v1/threads/{threadId}/debate-summary
 Authorization: Bearer {jwt_token}
 ```
 
 **Query Parameters**:
+
 - `includeCommentDetails` (optional, boolean): If true, include full comment text for each position
 
 **Response** (200 OK):
+
 ```json
 {
   "threadId": "t98765",
@@ -457,18 +463,21 @@ Authorization: Bearer {jwt_token}
 ```
 
 **Error Responses**:
+
 - `400 Bad Request`: Invalid threadId format
 - `404 Not Found`: Thread does not exist
 - `429 Too Many Requests`: Rate limit exceeded
 - `500 Internal Server Error`: Processing error
 
 #### 2. Regenerate Thread Summary
+
 ```http
 POST /api/v1/threads/{threadId}/debate-summary/regenerate
 Authorization: Bearer {jwt_token}
 ```
 
 **Request Body**:
+
 ```json
 {
   "reason": "new comments added",
@@ -477,6 +486,7 @@ Authorization: Bearer {jwt_token}
 ```
 
 **Response** (202 Accepted):
+
 ```json
 {
   "jobId": "job_abc123",
@@ -487,6 +497,7 @@ Authorization: Bearer {jwt_token}
 ```
 
 #### 3. Delete Cached Summary
+
 ```http
 DELETE /api/v1/threads/{threadId}/debate-summary
 Authorization: Bearer {jwt_token}
@@ -535,7 +546,7 @@ interface EvidenceAnchor {
   id: string;
   positionId: string;
   content: string;
-  strength: 'high' | 'medium' | 'low';
+  strength: "high" | "medium" | "low";
   sources: string[];
   commentCount: number;
 }
@@ -564,7 +575,10 @@ interface IPositionClusterer {
 }
 
 interface IEvidenceExtractor {
-  extractKeyEvidence(positions: Position[], comments: Comment[]): Promise<EvidenceAnchor[]>;
+  extractKeyEvidence(
+    positions: Position[],
+    comments: Comment[],
+  ): Promise<EvidenceAnchor[]>;
   rankEvidence(anchors: EvidenceAnchor[]): Promise<EvidenceAnchor[]>;
 }
 
@@ -581,6 +595,7 @@ interface IDebateQualityScorer {
 ### PostgreSQL Tables
 
 #### `debate_summaries` Table
+
 ```sql
 CREATE TABLE debate_summaries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -602,6 +617,7 @@ CREATE INDEX idx_debate_expires_at ON debate_summaries(expires_at);
 ```
 
 #### `positions` Table (Denormalized in JSONB for efficiency; alternative normalized structure)
+
 ```sql
 CREATE TABLE positions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -618,6 +634,7 @@ CREATE TABLE positions (
 ```
 
 #### `position_opponents` Table (Tracks which positions disagree)
+
 ```sql
 CREATE TABLE position_opponents (
   position1_id UUID NOT NULL,
@@ -629,6 +646,7 @@ CREATE TABLE position_opponents (
 ```
 
 ### Redis Key Structure
+
 ```
 debate_summary:{threadId} -> DebateSummary JSON object
 TTL: 172800 seconds (48 hours)
@@ -651,12 +669,14 @@ Example key: debate_summary:t98765
 ## Security and Privacy
 
 ### Data Protection
+
 - **In Transit**: All API calls use HTTPS/TLS 1.3
 - **At Rest**: PostgreSQL data encrypted at storage level
 - **AI Service**: Comment batch sent to OpenAI under enterprise DPA
 - **Cache**: Redis instance in private VPC, no public access
 
 ### Privacy & Access Control
+
 - **Authentication**: Requires valid moderator JWT token
 - **Authorization**: Only users with moderator role (verified in middleware)
 - **Data Sensitivity**: Thread summaries may be viewed by moderators only
@@ -664,6 +684,7 @@ Example key: debate_summary:t98765
 - **Audit Logging**: Log summary regeneration requests for moderator actions
 
 ### Privacy Considerations
+
 1. **Bulk Processing**: Batch comment processing complies with OpenAI DPA
 2. **Retention**: Delete cached summaries after 48-hour TTL, purge DB after 60 days
 3. **User Consent**: Moderators should disclose that AI analysis is used
@@ -671,6 +692,7 @@ Example key: debate_summary:t98765
 5. **Right to Deletion**: When thread is deleted, cascade delete summaries
 
 ### Compliance
+
 - **GDPR**: Support right-to-be-forgotten when thread deleted
 - **CCPA**: Data retention minimized to necessary operational period
 - **AI Transparency**: Disclose AI generation in summary UI ("AI-generated summary")
@@ -680,25 +702,25 @@ Example key: debate_summary:t98765
 ## Risks to Completion
 
 1. **Comment Volume Scalability**: 5000+ comments in a thread could timeout
-   - *Mitigation*: Implement async batch processing with Bull job queue, sample large threads
+   - _Mitigation_: Implement async batch processing with Bull job queue, sample large threads
 
 2. **Position Clustering False Merges**: Similar-sounding but distinct positions merged
-   - *Mitigation*: Conservative similarity thresholds, manual position merge UI for moderators, iterate with test data
+   - _Mitigation_: Conservative similarity thresholds, manual position merge UI for moderators, iterate with test data
 
 3. **AI Inference Cost**: Batch analyzing all comments is expensive at scale
-   - *Mitigation*: Reuse individual comment summaries from US1 if available, cache aggressively
+   - _Mitigation_: Reuse individual comment summaries from US1 if available, cache aggressively
 
 4. **Evidence Quality**: Weak evidence ranked as strong by AI
-   - *Mitigation*: Strength scoring calibration, human validation of top summaries, A/B test
+   - _Mitigation_: Strength scoring calibration, human validation of top summaries, A/B test
 
 5. **Disagreement Detection**: May miss subtle or implicit disagreements
-   - *Mitigation*: Allow moderators to add disagreements manually, feedback loop
+   - _Mitigation_: Allow moderators to add disagreements manually, feedback loop
 
 6. **Thread Edit Invalidation**: Edited comments not reflected in cached summary
-   - *Mitigation*: Invalidate cache on comment edit, maintain activity log
+   - _Mitigation_: Invalidate cache on comment edit, maintain activity log
 
 7. **Integration Complexity**: US2 depends on US1 services (AI, cache)
-   - *Mitigation*: Design shared service interfaces early, test dependency chain thoroughly
+   - _Mitigation_: Design shared service interfaces early, test dependency chain thoroughly
 
 8. **Moderator Decision Impact**: Summary influences moderation decisions; bias concerns
-   - *Mitigation*: Summary is advisory only, moderators retain full autonomy, transparency about limitations
+   - _Mitigation_: Summary is advisory only, moderators retain full autonomy, transparency about limitations

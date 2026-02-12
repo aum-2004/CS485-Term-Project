@@ -1,6 +1,7 @@
 # Development Specification: US3 - Real-Time Writing Feedback
 
 ## Overview
+
 This document specifies the development of the Real-Time Writing Feedback feature, enabling registered users to receive immediate assistance while composing a reply, with detection and flagging of circular logic, weak evidence, and unsupported assertions.
 
 **User Story**: As a registered user, I want real-time writing feedback that flags circular logic and weak evidence in my draft reply so that I can improve my argument before posting.
@@ -81,6 +82,7 @@ This document specifies the development of the Real-Time Writing Feedback featur
 ```
 
 **Component Locations**:
+
 - **Client**: React-based browser composer with real-time UI updates
 - **WebSocket Server**: Node.js backend with Socket.IO (same EC2 instance)
 - **API Server**: Express.js endpoints for POST feedback requests
@@ -88,6 +90,7 @@ This document specifies the development of the Real-Time Writing Feedback featur
 - **Cache**: Redis caches recent feedback for rapid re-display
 
 **Information Flows**:
+
 1. User types in composer (text input event)
 2. Debounced request (500ms) sent to backend with draft text
 3. Backend analyzes draft using Writing Feedback Service
@@ -164,23 +167,23 @@ This document specifies the development of the Real-Time Writing Feedback featur
 
 ## List of Classes
 
-| Class Name | Package | Responsibility |
-|-----------|---------|-----------------|
-| `WritingFeedbackService` | services | Orchestrates all real-time feedback analysis |
-| `WritingFeedbackController` | controllers | HTTP/WebSocket handler for feedback requests |
-| `CircularLogicDetector` | services | Detects self-referential or repeated arguments |
-| `WeakEvidenceDetector` | services | Identifies unsupported claims and weak citations |
-| `UnsupportedClaimsDetector` | services | Flags assertions lacking evidence |
-| `AIAnalysisService` | services | Shared AI service for claims/evidence extraction |
-| `CacheService` | services | Redis cache for feedback results |
-| `DraftRepository` | repositories | Database access for draft storage |
-| `FeedbackLogRepository` | repositories | Database access for feedback history |
-| `FeedbackResult` | models/dtos | Container for feedback analysis output |
-| `Issue` | models | Represents a single problem detected in draft |
-| `WritingFeedbackCache` | utils | Efficient cache key management |
-| `CitationParser` | utils | Extracts citations and source references |
-| `SentenceGraphBuilder` | utils | Constructs argument dependency graph |
-| `NgramAnalyzer` | utils | N-gram analysis for repetition detection |
+| Class Name                  | Package      | Responsibility                                   |
+| --------------------------- | ------------ | ------------------------------------------------ |
+| `WritingFeedbackService`    | services     | Orchestrates all real-time feedback analysis     |
+| `WritingFeedbackController` | controllers  | HTTP/WebSocket handler for feedback requests     |
+| `CircularLogicDetector`     | services     | Detects self-referential or repeated arguments   |
+| `WeakEvidenceDetector`      | services     | Identifies unsupported claims and weak citations |
+| `UnsupportedClaimsDetector` | services     | Flags assertions lacking evidence                |
+| `AIAnalysisService`         | services     | Shared AI service for claims/evidence extraction |
+| `CacheService`              | services     | Redis cache for feedback results                 |
+| `DraftRepository`           | repositories | Database access for draft storage                |
+| `FeedbackLogRepository`     | repositories | Database access for feedback history             |
+| `FeedbackResult`            | models/dtos  | Container for feedback analysis output           |
+| `Issue`                     | models       | Represents a single problem detected in draft    |
+| `WritingFeedbackCache`      | utils        | Efficient cache key management                   |
+| `CitationParser`            | utils        | Extracts citations and source references         |
+| `SentenceGraphBuilder`      | utils        | Constructs argument dependency graph             |
+| `NgramAnalyzer`             | utils        | N-gram analysis for repetition detection         |
 
 ---
 
@@ -371,7 +374,7 @@ User Types in Comment Composer
     User Continues Editing
            │
            ▼ (Loop back to "User Types")
-           
+
     User Clicks [Submit/Post]
            │
            ▼
@@ -385,39 +388,39 @@ User Types in Comment Composer
 
 ## Development Risks and Failures
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|-----------|
-| **Latency Performance** | High | Slow feedback frustrates users with real-time expectations | Aggressive caching, debounce, async analysis, optimize AI calls |
-| **False Positives** | Medium | Incorrect flags damage user confidence in system | Conservative thresholds, user override UI, feedback loop |
-| **WebSocket Reliability** | Medium | Connection drops lose user feedback in progress | Implement reconnection logic, fallback to HTTP polling |
-| **Cache Coherence** | Low | Different analysis results due to bad caching | Use deterministic hash of draft text, short TTL (1h) |
-| **Circular Logic Complexity** | Medium | Difficult to detect all circular reasoning types | Focus on obvious patterns first, allow false negatives |
-| **AI Service Overload** | Medium | High frequency requests overwhelm OpenAI API | Queue requests, batch when possible, longer debounce |
-| **Evidence Validation Errors** | Medium | Non-existent or weak sources marked as good | Manual validation of citation extraction, user feedback |
-| **User Privacy** | Low | Draft text sent to 3rd-party AI service | Use OpenAI enterprise DPA, offer local analysis option |
-| **Usability Overload** | Medium | Too many feedback items make panel unreadable | Limit to top 3-5 critical issues, group by type |
-| **Draft Data Leakage** | Low | Unfinished draft comments stored permanently | Clear drafts after 30 days, allow manual deletion |
+| Risk                           | Likelihood | Impact                                                     | Mitigation                                                      |
+| ------------------------------ | ---------- | ---------------------------------------------------------- | --------------------------------------------------------------- |
+| **Latency Performance**        | High       | Slow feedback frustrates users with real-time expectations | Aggressive caching, debounce, async analysis, optimize AI calls |
+| **False Positives**            | Medium     | Incorrect flags damage user confidence in system           | Conservative thresholds, user override UI, feedback loop        |
+| **WebSocket Reliability**      | Medium     | Connection drops lose user feedback in progress            | Implement reconnection logic, fallback to HTTP polling          |
+| **Cache Coherence**            | Low        | Different analysis results due to bad caching              | Use deterministic hash of draft text, short TTL (1h)            |
+| **Circular Logic Complexity**  | Medium     | Difficult to detect all circular reasoning types           | Focus on obvious patterns first, allow false negatives          |
+| **AI Service Overload**        | Medium     | High frequency requests overwhelm OpenAI API               | Queue requests, batch when possible, longer debounce            |
+| **Evidence Validation Errors** | Medium     | Non-existent or weak sources marked as good                | Manual validation of citation extraction, user feedback         |
+| **User Privacy**               | Low        | Draft text sent to 3rd-party AI service                    | Use OpenAI enterprise DPA, offer local analysis option          |
+| **Usability Overload**         | Medium     | Too many feedback items make panel unreadable              | Limit to top 3-5 critical issues, group by type                 |
+| **Draft Data Leakage**         | Low        | Unfinished draft comments stored permanently               | Clear drafts after 30 days, allow manual deletion               |
 
 ---
 
 ## Technology Stack
 
-| Layer | Technology | Version | Purpose |
-|-------|-----------|---------|---------|
-| **Frontend** | React | 18.x | Composer UI with real-time feedback panel |
-| **Frontend** | TypeScript | 5.x | Type safety in UI code |
-| **Frontend** | Socket.IO Client | 4.x | WebSocket connection to backend |
-| **Backend** | Node.js | 18.x LTS | Runtime |
-| **Backend** | Express.js | 4.x | HTTP API framework |
-| **Backend** | Socket.IO | 4.x | WebSocket server for real-time updates |
-| **Backend** | TypeScript | 5.x | Type safety in server code |
-| **AI Service** | OpenAI API | GPT-4 | Claims and evidence extraction |
-| **Database** | PostgreSQL | 14+ | Draft storage and feedback logs |
-| **Cache** | Redis | 7.x | Feedback result caching (1h TTL) |
-| **NLP** | natural/compromise | Latest | Local sentence parsing, n-gram analysis |
-| **Graph Analysis** | dependency-graph | Latest | Build argument relationship graph |
-| **Testing** | Jest | 29.x | Unit and integration tests |
-| **Async Tasks** | Bull | 4.x | Background job processing for offline analysis |
+| Layer              | Technology         | Version  | Purpose                                        |
+| ------------------ | ------------------ | -------- | ---------------------------------------------- |
+| **Frontend**       | React              | 18.x     | Composer UI with real-time feedback panel      |
+| **Frontend**       | TypeScript         | 5.x      | Type safety in UI code                         |
+| **Frontend**       | Socket.IO Client   | 4.x      | WebSocket connection to backend                |
+| **Backend**        | Node.js            | 18.x LTS | Runtime                                        |
+| **Backend**        | Express.js         | 4.x      | HTTP API framework                             |
+| **Backend**        | Socket.IO          | 4.x      | WebSocket server for real-time updates         |
+| **Backend**        | TypeScript         | 5.x      | Type safety in server code                     |
+| **AI Service**     | OpenAI API         | GPT-4    | Claims and evidence extraction                 |
+| **Database**       | PostgreSQL         | 14+      | Draft storage and feedback logs                |
+| **Cache**          | Redis              | 7.x      | Feedback result caching (1h TTL)               |
+| **NLP**            | natural/compromise | Latest   | Local sentence parsing, n-gram analysis        |
+| **Graph Analysis** | dependency-graph   | Latest   | Build argument relationship graph              |
+| **Testing**        | Jest               | 29.x     | Unit and integration tests                     |
+| **Async Tasks**    | Bull               | 4.x      | Background job processing for offline analysis |
 
 ---
 
@@ -426,12 +429,14 @@ User Types in Comment Composer
 ### Public REST Endpoints
 
 #### 1. Analyze Draft for Feedback
+
 ```http
 POST /api/v1/composer/draft-feedback
 Authorization: Bearer {jwt_token}
 ```
 
 **Request Body**:
+
 ```json
 {
   "draftText": "I think climate change is real because all scientists agree on it. Plus, I already said this before, so this is another point you're missing.",
@@ -441,6 +446,7 @@ Authorization: Bearer {jwt_token}
 ```
 
 **Response** (200 OK):
+
 ```json
 {
   "issues": [
@@ -485,22 +491,26 @@ Authorization: Bearer {jwt_token}
 ```
 
 **Error Responses**:
+
 - `400 Bad Request`: Empty or invalid draftText
 - `401 Unauthorized`: Missing or invalid JWT token
 - `429 Too Many Requests`: Rate limit exceeded (100 req/min per user)
 - `500 Internal Server Error`: Analysis failure
 
 #### 2. Get Feedback History for User
+
 ```http
 GET /api/v1/composer/draft-feedback/history
 Authorization: Bearer {jwt_token}
 ```
 
 **Query Parameters**:
+
 - `limit` (optional, integer): Max results to return (default 20)
 - `offset` (optional, integer): Pagination offset (default 0)
 
 **Response** (200 OK):
+
 ```json
 {
   "feedbacks": [
@@ -519,12 +529,14 @@ Authorization: Bearer {jwt_token}
 ```
 
 #### 3. Save Draft (Optional)
+
 ```http
 POST /api/v1/composer/drafts
 Authorization: Bearer {jwt_token}
 ```
 
 **Request Body**:
+
 ```json
 {
   "text": "Draft comment text...",
@@ -534,6 +546,7 @@ Authorization: Bearer {jwt_token}
 ```
 
 **Response** (201 Created):
+
 ```json
 {
   "id": "draft_xyz789",
@@ -602,10 +615,10 @@ socket.on('draft:saved', (data: {
 // ComposerWithFeedback Component
 interface ComposerWithFeedbackProps {
   contextId: string;
-  contextType: 'thread' | 'comment';
+  contextType: "thread" | "comment";
   onCommentSubmit: (text: string) => Promise<void>;
   onDraftSaved?: (draftId: string) => void;
-  theme?: 'light' | 'dark';
+  theme?: "light" | "dark";
 }
 
 // FeedbackResult DTO
@@ -619,12 +632,16 @@ interface FeedbackResult {
 }
 
 interface WritingIssue {
-  type: 'circular_logic' | 'weak_evidence' | 'unsupported_claim' | 'logical_fallacy';
+  type:
+    | "circular_logic"
+    | "weak_evidence"
+    | "unsupported_claim"
+    | "logical_fallacy";
   position: { start: number; end: number };
   lineNumber: number;
   flaggedText: string;
   explanation: string;
-  severity: 'low' | 'medium' | 'high';
+  severity: "low" | "medium" | "high";
   confidence: number; // 0 to 1
 }
 ```
@@ -665,6 +682,7 @@ interface IUnsupportedClaimsDetector {
 ### PostgreSQL Tables
 
 #### `drafts` Table
+
 ```sql
 CREATE TABLE drafts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -686,6 +704,7 @@ CREATE INDEX idx_drafts_context ON drafts(context_id, context_type);
 ```
 
 #### `feedback_logs` Table
+
 ```sql
 CREATE TABLE feedback_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -707,6 +726,7 @@ CREATE INDEX idx_feedback_created_at ON feedback_logs(created_at);
 ```
 
 ### Redis Key Structure
+
 ```
 draft_feedback:{draftHash} -> FeedbackResult JSON object
 TTL: 3600 seconds (1 hour)
@@ -727,18 +747,21 @@ Example key: draft_feedback:abc123def456
 ## Security and Privacy
 
 ### Data Protection
+
 - **In Transit**: All connections use HTTPS/TLS 1.3 and secure WebSocket (WSS)
 - **At Rest**: PostgreSQL data encrypted at storage level
 - **AI Service**: Draft text sent to OpenAI under enterprise DPA
 - **Cache**: Redis instance in private VPC, no public access
 
 ### Authentication & Authorization
+
 - **Authentication**: JWT token required for all endpoints
 - **Authorization**: Users can only analyze their own drafts
 - **Rate Limiting**: 100 analysis requests per minute per user
 - **Session Validation**: Verify token on WebSocket upgrade
 
 ### Privacy Considerations
+
 1. **Draft Data**: Stored temporarily, auto-deleted after 30 days
 2. **Feedback History**: Kept for 90 days for user reference
 3. **AI Processing**: Anonymize user identity before sending to OpenAI if possible
@@ -746,11 +769,13 @@ Example key: draft_feedback:abc123def456
 5. **User Consent**: Display notice that drafts are processed by 3rd-party AI
 
 ### Access Control
+
 - **Data Isolation**: Each user can only see their own drafts/feedback
 - **Moderator Access**: Moderators cannot view user drafts
 - **User Deletion**: Implement GDPR right-to-be-forgotten for drafts
 
 ### Compliance
+
 - **GDPR**: Support deletion of draft history on request
 - **CCPA**: Minimal retention (30 days), user control over data
 - **AI Transparency**: Clearly indicate feedback is "AI-generated" in UI
@@ -761,31 +786,31 @@ Example key: draft_feedback:abc123def456
 ## Risks to Completion
 
 1. **Real-Time Latency Requirements**: Users expect <1 second feedback
-   - *Mitigation*: Aggressive caching, pre-compute on frequent patterns, debounce at 500ms
+   - _Mitigation_: Aggressive caching, pre-compute on frequent patterns, debounce at 500ms
 
 2. **WebSocket Scalability**: Maintaining thousands of concurrent connections
-   - *Mitigation*: Use Socket.IO with Redis adapter, horizontal scaling
+   - _Mitigation_: Use Socket.IO with Redis adapter, horizontal scaling
 
 3. **AI Inference Cost**: Analyzing every keystroke is expensive
-   - *Mitigation*: Debounce, cache results, background analysis for long drafts
+   - _Mitigation_: Debounce, cache results, background analysis for long drafts
 
 4. **Circular Logic Detection Accuracy**: Complex task for LLM
-   - *Mitigation*: Focus on obvious n-gram repetition first, use heuristics, iterate
+   - _Mitigation_: Focus on obvious n-gram repetition first, use heuristics, iterate
 
 5. **False Positive Feedback**: Incorrect flags reduce user trust
-   - *Mitigation*: Conservative thresholds, allow user override, collect feedback
+   - _Mitigation_: Conservative thresholds, allow user override, collect feedback
 
 6. **Integration with Existing UI**: Composer widget already exists
-   - *Mitigation*: Design as wrapper component, minimal changes to existing code
+   - _Mitigation_: Design as wrapper component, minimal changes to existing code
 
 7. **Privacy Concerns**: Sending draft text to OpenAI
-   - *Mitigation*: Clear user consent, enterprise DPA, offer local analysis option
+   - _Mitigation_: Clear user consent, enterprise DPA, offer local analysis option
 
 8. **Dependency on AIAnalysisService**: Shared with US1/US2
-   - *Mitigation*: Test integration thoroughly, design fallback for service failure
+   - _Mitigation_: Test integration thoroughly, design fallback for service failure
 
 9. **User Cognitive Overload**: Too much feedback overwhelming
-   - *Mitigation*: Limit to top 3 issues, group by category, progressive disclosure
+   - _Mitigation_: Limit to top 3 issues, group by category, progressive disclosure
 
 10. **Draft Storage Complexity**: Managing draft lifecycle and cleanup
-    - *Mitigation*: Database triggers for auto-delete, cache invalidation on edit
+    - _Mitigation_: Database triggers for auto-delete, cache invalidation on edit

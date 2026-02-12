@@ -42,7 +42,8 @@ All three specs include all required sections:
 
 **Impact**: Introduces unnecessary Python microservice dependency, breaking consistency.
 
-**Resolution**: 
+**Resolution**:
+
 - Changed US2 Technology Stack row from:
   - `| **ML/Clustering** | scikit-learn (via Python microservice) OR natural | Latest |`
   - To: `| **ML/Clustering** | natural | Latest |`
@@ -50,7 +51,8 @@ All three specs include all required sections:
 
 ### 2. ✅ FIXED: Missing Authentication Headers in API Definitions
 
-**Issue**: 
+**Issue**:
+
 - US3 showed `Authorization: Bearer {jwt_token}` in all API examples
 - US1 and US2 did NOT show authentication headers in API code blocks
 - However, all three mentioned JWT authentication in Security/Privacy sections
@@ -58,6 +60,7 @@ All three specs include all required sections:
 **Impact**: API documentation inconsistency creates confusion for developers.
 
 **Resolution**:
+
 - Added `Authorization: Bearer {jwt_token}` headers to all API endpoint definitions:
   - US1: GET /api/v1/comments/{commentId}/reasoning-summary
   - US2: GET /api/v1/threads/{threadId}/debate-summary
@@ -70,30 +73,34 @@ All three specs include all required sections:
 ## Consistency Validation
 
 ### ✅ Technology Stack Consistency
-| Layer | US1 | US2 | US3 | Status |
-|-------|-----|-----|-----|--------|
-| Frontend | React 18.x | React 18.x | React 18.x | ✅ Consistent |
-| Backend | Node.js 18.x LTS | Node.js 18.x LTS | Node.js 18.x LTS | ✅ Consistent |
-| Framework | Express.js 4.x | Express.js 4.x | Express.js 4.x | ✅ Consistent |
-| Language | TypeScript 5.x | TypeScript 5.x | TypeScript 5.x | ✅ Consistent |
-| AI Service | OpenAI GPT-4 | OpenAI GPT-4 | OpenAI GPT-4 | ✅ Consistent |
-| Database | PostgreSQL 14+ | PostgreSQL 14+ | PostgreSQL 14+ | ✅ Consistent |
-| Cache | Redis 7.x | Redis 7.x | Redis 7.x | ✅ Consistent |
-| Testing | Jest 29.x | Jest 29.x | Jest 29.x | ✅ Consistent |
-| Job Queue | Bull 4.x | Bull 4.x | Bull 4.x | ✅ Consistent |
+
+| Layer      | US1              | US2              | US3              | Status        |
+| ---------- | ---------------- | ---------------- | ---------------- | ------------- |
+| Frontend   | React 18.x       | React 18.x       | React 18.x       | ✅ Consistent |
+| Backend    | Node.js 18.x LTS | Node.js 18.x LTS | Node.js 18.x LTS | ✅ Consistent |
+| Framework  | Express.js 4.x   | Express.js 4.x   | Express.js 4.x   | ✅ Consistent |
+| Language   | TypeScript 5.x   | TypeScript 5.x   | TypeScript 5.x   | ✅ Consistent |
+| AI Service | OpenAI GPT-4     | OpenAI GPT-4     | OpenAI GPT-4     | ✅ Consistent |
+| Database   | PostgreSQL 14+   | PostgreSQL 14+   | PostgreSQL 14+   | ✅ Consistent |
+| Cache      | Redis 7.x        | Redis 7.x        | Redis 7.x        | ✅ Consistent |
+| Testing    | Jest 29.x        | Jest 29.x        | Jest 29.x        | ✅ Consistent |
+| Job Queue  | Bull 4.x         | Bull 4.x         | Bull 4.x         | ✅ Consistent |
 
 **Variations (Justified by Use Case)**:
+
 - US2: Adds Material-UI 5.x (for complex moderator dashboard UI) ✅
 - US3: Adds Socket.IO 4.x (for real-time WebSocket communication) ✅
 - US3: Adds dependency-graph (for argument relationship analysis) ✅
 
 ### ✅ API Design Consistency
+
 - All use `/api/v1/` versioning pattern ✅
 - All include JWT authentication requirements ✅
 - All follow RESTful conventions (GET for retrieval, POST for actions, DELETE for removal) ✅
 - All include proper error response codes (400, 401, 404, 429, 500) ✅
 
 ### ✅ Data Schema Consistency
+
 - All use UUID primary keys ✅
 - All use created_at/updated_at timestamps ✅
 - All use proper SQL indexes ✅
@@ -103,6 +110,7 @@ All three specs include all required sections:
   - US3: 1 hour (draft feedback, changes often as user types)
 
 ### ✅ Security & Privacy Consistency
+
 - All require HTTPS/TLS 1.3 for in-transit protection ✅
 - All mention GDPR/CCPA compliance ✅
 - All use JWT token authentication ✅
@@ -110,6 +118,7 @@ All three specs include all required sections:
 - All have rate limiting strategies ✅
 
 ### ✅ Architecture Consistency
+
 - All use same 3-tier architecture (Client → API Server → Database/Cache) ✅
 - All clearly document component locations ✅
 - All describe information flows between components ✅
@@ -120,6 +129,7 @@ All three specs include all required sections:
 ## Formatting & Neatness
 
 ### ✅ Markdown Formatting
+
 - All use proper heading hierarchy (H1 for title, H2 for sections) ✅
 - All code blocks properly formatted with language specification ✅
 - All tables properly formatted with alignment ✅
@@ -127,6 +137,7 @@ All three specs include all required sections:
 - All links and references are properly formatted ✅
 
 ### ✅ Code Examples
+
 - JSON examples are properly formatted and valid ✅
 - SQL examples include proper syntax highlighting ✅
 - TypeScript interfaces follow consistent syntax ✅
@@ -150,14 +161,14 @@ The following were verified to have NO inconsistencies:
 
 ## Summary Statistics
 
-| Metric | Count |
-|--------|-------|
-| Total Specs | 3 |
-| Total Sections | 39 (3 × 13) |
-| Issues Found | 2 |
-| Issues Fixed | 2 |
-| Remaining Issues | 0 |
-| Consistency Score | 100% |
+| Metric            | Count       |
+| ----------------- | ----------- |
+| Total Specs       | 3           |
+| Total Sections    | 39 (3 × 13) |
+| Issues Found      | 2           |
+| Issues Fixed      | 2           |
+| Remaining Issues  | 0           |
+| Consistency Score | 100%        |
 
 ---
 
@@ -176,6 +187,6 @@ The following were verified to have NO inconsistencies:
 ✅ **All specs reviewed and validated**  
 ✅ **All inconsistencies resolved**  
 ✅ **All required sections present**  
-✅ **Formatting verified as neat and professional**  
+✅ **Formatting verified as neat and professional**
 
 **Ready for Development**

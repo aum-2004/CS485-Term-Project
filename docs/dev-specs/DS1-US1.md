@@ -1,6 +1,7 @@
 # Development Specification: US1 - Inline AI Reasoning Summary
 
 ## Overview
+
 This document specifies the development of the Inline AI Reasoning Summary feature for new users, enabling quick understanding of comment quality through AI-generated reasoning summaries displayed inline next to each comment.
 
 **User Story**: As a new user, I want an inline AI summary of a comment's reasoning so that I can quickly understand its main claims and supporting evidence.
@@ -61,12 +62,14 @@ This document specifies the development of the Inline AI Reasoning Summary featu
 ```
 
 **Component Locations**:
+
 - **Client**: Browser-based React component
 - **API Server**: Node.js/Express backend (AWS EC2 or similar)
 - **Database**: PostgreSQL (primary data store)
 - **Cache**: Redis (in-memory summaries cache)
 
 **Information Flows**:
+
 1. User clicks "Show AI Summary" on comment
 2. Client sends GET request to API with `commentId`
 3. API checks Redis cache first
@@ -124,19 +127,19 @@ This document specifies the development of the Inline AI Reasoning Summary featu
 
 ## List of Classes
 
-| Class Name | Package | Responsibility |
-|-----------|---------|-----------------|
-| `ReasoningSummaryService` | services | Orchestrates summary generation and retrieval |
-| `ReasoningSummaryController` | controllers | HTTP request handler for summary endpoints |
-| `AIAnalysisService` | services | AI-powered text analysis (claims, evidence, coherence) |
-| `CacheService` | services | Redis cache management |
-| `CommentRepository` | repositories | Database access for comments |
-| `ReasoningSummaryRepository` | repositories | Database access for cached summaries |
-| `ReasoningSummary` | models/dtos | Data Transfer Object for summary response |
-| `Claim` | models | Represents extracted claim from text |
-| `EvidenceBlock` | models | Represents piece of evidence supporting a claim |
-| `NLPProcessor` | utils | Natural Language Processing utilities |
-| `CommentValidator` | utils | Validation for comment text input |
+| Class Name                   | Package      | Responsibility                                         |
+| ---------------------------- | ------------ | ------------------------------------------------------ |
+| `ReasoningSummaryService`    | services     | Orchestrates summary generation and retrieval          |
+| `ReasoningSummaryController` | controllers  | HTTP request handler for summary endpoints             |
+| `AIAnalysisService`          | services     | AI-powered text analysis (claims, evidence, coherence) |
+| `CacheService`               | services     | Redis cache management                                 |
+| `CommentRepository`          | repositories | Database access for comments                           |
+| `ReasoningSummaryRepository` | repositories | Database access for cached summaries                   |
+| `ReasoningSummary`           | models/dtos  | Data Transfer Object for summary response              |
+| `Claim`                      | models       | Represents extracted claim from text                   |
+| `EvidenceBlock`              | models       | Represents piece of evidence supporting a claim        |
+| `NLPProcessor`               | utils        | Natural Language Processing utilities                  |
+| `CommentValidator`           | utils        | Validation for comment text input                      |
 
 ---
 
@@ -266,34 +269,34 @@ Panel Below Comment
 
 ## Development Risks and Failures
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|-----------|
-| **API Rate Limiting** | High | Service delays if OpenAI API limits hit | Implement request queuing, cache aggressively, monitor usage |
-| **AI Summary Quality** | Medium | Poor summaries confuse users | Extensive prompt engineering, user feedback loop, A/B testing |
-| **Cache Staleness** | Low | Edited comments show old summaries | Set reasonable TTL (24h), invalidate on comment edit |
-| **Latency on First Load** | High | Slow response time impacts UX | Cache warming, background job processing, optimize AI prompts |
-| **Data Privacy** | Medium | Comments sent to 3rd-party AI service | Use OpenAI enterprise agreement, anonymize if possible, encryption in transit |
-| **Dependency on OpenAI** | Medium | Service unavailable if OpenAI down | Graceful degradation, fallback handler, monitoring/alerting |
-| **Scalability** | Medium | High traffic overwhelms Redis/DB | Horizontal scaling plan, read replicas, consider distributed cache |
-| **Coherence Score Accuracy** | Medium | Misleading quality scores | Validate with domain experts, collect user feedback, iterate |
+| Risk                         | Likelihood | Impact                                  | Mitigation                                                                    |
+| ---------------------------- | ---------- | --------------------------------------- | ----------------------------------------------------------------------------- |
+| **API Rate Limiting**        | High       | Service delays if OpenAI API limits hit | Implement request queuing, cache aggressively, monitor usage                  |
+| **AI Summary Quality**       | Medium     | Poor summaries confuse users            | Extensive prompt engineering, user feedback loop, A/B testing                 |
+| **Cache Staleness**          | Low        | Edited comments show old summaries      | Set reasonable TTL (24h), invalidate on comment edit                          |
+| **Latency on First Load**    | High       | Slow response time impacts UX           | Cache warming, background job processing, optimize AI prompts                 |
+| **Data Privacy**             | Medium     | Comments sent to 3rd-party AI service   | Use OpenAI enterprise agreement, anonymize if possible, encryption in transit |
+| **Dependency on OpenAI**     | Medium     | Service unavailable if OpenAI down      | Graceful degradation, fallback handler, monitoring/alerting                   |
+| **Scalability**              | Medium     | High traffic overwhelms Redis/DB        | Horizontal scaling plan, read replicas, consider distributed cache            |
+| **Coherence Score Accuracy** | Medium     | Misleading quality scores               | Validate with domain experts, collect user feedback, iterate                  |
 
 ---
 
 ## Technology Stack
 
-| Layer | Technology | Version | Purpose |
-|-------|-----------|---------|---------|
-| **Frontend** | React | 18.x | UI component for summary display |
-| **Frontend** | TypeScript | 5.x | Type safety in client code |
-| **Backend** | Node.js | 18.x LTS | Runtime environment |
-| **Backend** | Express.js | 4.x | HTTP API framework |
-| **Backend** | TypeScript | 5.x | Type safety in server code |
-| **AI Service** | OpenAI API | GPT-4 | Text analysis and summary generation |
-| **Database** | PostgreSQL | 14+ | Primary data store for comments/summaries |
-| **Cache** | Redis | 7.x | In-memory cache for summaries |
-| **NLP** | natural/compromise | Latest | Optional local NLP fallback |
-| **Testing** | Jest | 29.x | Unit and integration testing |
-| **Async** | Bull | 4.x | Job queue for background summary generation |
+| Layer          | Technology         | Version  | Purpose                                     |
+| -------------- | ------------------ | -------- | ------------------------------------------- |
+| **Frontend**   | React              | 18.x     | UI component for summary display            |
+| **Frontend**   | TypeScript         | 5.x      | Type safety in client code                  |
+| **Backend**    | Node.js            | 18.x LTS | Runtime environment                         |
+| **Backend**    | Express.js         | 4.x      | HTTP API framework                          |
+| **Backend**    | TypeScript         | 5.x      | Type safety in server code                  |
+| **AI Service** | OpenAI API         | GPT-4    | Text analysis and summary generation        |
+| **Database**   | PostgreSQL         | 14+      | Primary data store for comments/summaries   |
+| **Cache**      | Redis              | 7.x      | In-memory cache for summaries               |
+| **NLP**        | natural/compromise | Latest   | Optional local NLP fallback                 |
+| **Testing**    | Jest               | 29.x     | Unit and integration testing                |
+| **Async**      | Bull               | 4.x      | Job queue for background summary generation |
 
 ---
 
@@ -302,15 +305,18 @@ Panel Below Comment
 ### Public REST Endpoints
 
 #### 1. Get Reasoning Summary
+
 ```http
 GET /api/v1/comments/{commentId}/reasoning-summary
 Authorization: Bearer {jwt_token}
 ```
 
 **Query Parameters**:
+
 - None
 
 **Response** (200 OK):
+
 ```json
 {
   "commentId": "c12345",
@@ -329,6 +335,7 @@ Authorization: Bearer {jwt_token}
 ```
 
 **Error Responses**:
+
 - `400 Bad Request`: Invalid commentId format
 - `404 Not Found`: Comment does not exist
 - `429 Too Many Requests`: Rate limit exceeded
@@ -346,7 +353,7 @@ interface ReasoningSummaryPanelProps {
   commentId: string;
   isExpanded?: boolean;
   onSummaryLoaded?: (summary: ReasoningSummary) => void;
-  theme?: 'light' | 'dark';
+  theme?: "light" | "dark";
 }
 
 // ReasoningSummary DTO
@@ -360,9 +367,9 @@ interface ReasoningSummary {
 }
 
 interface EvidenceBlock {
-  type: 'study' | 'data' | 'anecdote' | 'authority' | 'other';
+  type: "study" | "data" | "anecdote" | "authority" | "other";
   content: string;
-  strength: 'high' | 'medium' | 'low';
+  strength: "high" | "medium" | "low";
 }
 ```
 
@@ -378,7 +385,10 @@ interface IReasoningSummaryService {
 interface IAIAnalysisService {
   extractClaims(text: string): Promise<Claim[]>;
   extractEvidence(text: string): Promise<EvidenceBlock[]>;
-  evaluateCoherence(claims: Claim[], evidence: EvidenceBlock[]): Promise<number>;
+  evaluateCoherence(
+    claims: Claim[],
+    evidence: EvidenceBlock[],
+  ): Promise<number>;
   generateSummary(analysis: AnalysisResult): Promise<string>;
 }
 ```
@@ -390,6 +400,7 @@ interface IAIAnalysisService {
 ### PostgreSQL Tables
 
 #### `reasoning_summaries` Table
+
 ```sql
 CREATE TABLE reasoning_summaries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -409,6 +420,7 @@ CREATE INDEX idx_reasoning_expires_at ON reasoning_summaries(expires_at);
 ```
 
 #### `evidence_blocks` Table (Denormalized in JSONB for this feature; alternative normalized structure)
+
 ```sql
 CREATE TABLE evidence_blocks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -421,6 +433,7 @@ CREATE TABLE evidence_blocks (
 ```
 
 ### Redis Key Structure
+
 ```
 reasoning_summary:{commentId} -> ReasoningSummary JSON object
 TTL: 86400 seconds (24 hours)
@@ -441,23 +454,27 @@ Example key: reasoning_summary:c12345
 ## Security and Privacy
 
 ### Data Protection
+
 - **In Transit**: All API calls use HTTPS/TLS 1.3
 - **At Rest**: PostgreSQL data encrypted at storage level
 - **AI Service**: Comments sent to OpenAI under enterprise agreement with data processing addendum (DPA)
 - **Cache**: Redis instance runs in private VPC, no public access
 
 ### Privacy Considerations
+
 1. **Anonymization**: Remove personally identifiable information (PII) before sending to OpenAI if possible
 2. **User Consent**: Display notice that comment text is processed by AI third-party service
 3. **Data Retention**: Delete cached summaries after 24-hour TTL, purge from DB after 30 days if unused
 4. **Access Control**: API endpoints require valid user session (JWT token validation)
 
 ### Authentication & Authorization
+
 - **Authentication**: JWT token required for API access
 - **Authorization**: Only comment author or moderator can request summary (optional restriction based on product decision)
 - **Rate Limiting**: 100 requests per minute per user to prevent abuse
 
 ### Compliance
+
 - **GDPR**: Support right-to-be-forgotten with comment deletion
 - **CCPA**: Data retention policy complies with minimum necessary principle
 - **AI Transparency**: Clear disclosure that summaries are AI-generated
@@ -467,19 +484,19 @@ Example key: reasoning_summary:c12345
 ## Risks to Completion
 
 1. **OpenAI API Costs**: Scaling to millions of comments could be expensive
-   - *Mitigation*: Implement aggressive caching (24h TTL), batch process during off-peak hours
+   - _Mitigation_: Implement aggressive caching (24h TTL), batch process during off-peak hours
 
 2. **Prompt Engineering Quality**: LLM may need many iterations to produce useful summaries
-   - *Mitigation*: Allocate time for A/B testing, collect user feedback early
+   - _Mitigation_: Allocate time for A/B testing, collect user feedback early
 
 3. **Integration with Existing Comment System**: May require DB schema changes
-   - *Mitigation*: Plan schema migration carefully, test with data backup
+   - _Mitigation_: Plan schema migration carefully, test with data backup
 
 4. **Real-time Performance**: Summary generation adds latency to comment loading
-   - *Mitigation*: Background job processing, show "loading" state, pre-generate for popular comments
+   - _Mitigation_: Background job processing, show "loading" state, pre-generate for popular comments
 
 5. **Maintaining Consistency**: Cache invalidation is complex
-   - *Mitigation*: Clear TTL strategy, event-driven invalidation on comment edit
+   - _Mitigation_: Clear TTL strategy, event-driven invalidation on comment edit
 
 6. **Evaluation Metrics**: Difficult to measure summary quality objectively
-   - *Mitigation*: User satisfaction surveys, benchmark against human reviewers
+   - _Mitigation_: User satisfaction surveys, benchmark against human reviewers
