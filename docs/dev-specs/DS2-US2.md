@@ -8,6 +8,8 @@ This document specifies the development of the Moderator Debate Summaries featur
 
 **T-Shirt Size**: Medium
 
+Rationale: This option is devoted to the moderators that require the systematized understanding of the quality of the discussion on several threads. Although User Story 1 enhances the personal user experience, the functional aspect promotes governance and monitoring at the platform level. It assists the moderators in discovering patterns of reasoning quality and repetition as well as the general patterns of engagement.
+
 ---
 
 ## Architecture Diagram
@@ -93,6 +95,8 @@ This document specifies the development of the Moderator Debate Summaries featur
 8. Summary is cached in Redis for 48 hours
 9. Response returned to client and displayed in moderator panel
 
+Rationale: This architecture is based on the backend and database of Development Specification 1. An independent Analytics Service will make certain that the logic of aggregation is independent of the logic of AI generation.
+
 ---
 
 ## Class Diagram
@@ -174,6 +178,7 @@ This document specifies the development of the Moderator Debate Summaries featur
     │  Promise<void>  │  Id(id): Prom│: Prom<void> │
     └─────────────────┴──────────────┴──────────────┘
 ```
+Rationale: The MetricsCalculator separates the logic of computation of averages and level of engagement. This is a separation which enhances maintainability and lessens coupling.
 
 ---
 
@@ -197,6 +202,8 @@ This document specifies the development of the Moderator Debate Summaries featur
 | `ThreadRepository`        | repositories | Database access for thread metadata                              |
 | `CommentRepository`       | repositories | Database access for thread comments                              |
 | `DebateSummaryRepository` | repositories | Database access for cached debate summaries                      |
+
+Rationale: Stated classes eliminate diagram-implementation discrepancies.
 
 ---
 
@@ -272,6 +279,8 @@ This document specifies the development of the Moderator Debate Summaries featur
 │  Ready to Return to Client     │
 └────────────────────────────────┘
 ```
+
+Rationale: This ensures predictable UI transitions while data is being aggregated.
 
 ---
 
@@ -374,6 +383,8 @@ Client Sends: GET /api/v1/threads/{threadId}/debate-summary
   processes all comments in batch
 ```
 
+Rationale: The flow emphasizes aggregation rather than AI processing
+
 ---
 
 ## Development Risks and Failures
@@ -388,6 +399,7 @@ Client Sends: GET /api/v1/threads/{threadId}/debate-summary
 | **Cache Invalidation**                 | Low        | Edited comments show stale analysis                   | Invalidate cache on comment edit/delete, 48h expiration anyway      |
 | **Competing Summary Generations**      | Low        | Multiple regenerate requests cause duplicate work     | Implement generation lock/semaphore                                 |
 | **Moderator Cognitive Overload**       | Medium     | Summary too complex or verbose                        | Limit to top 3-4 positions, keep text concise                       |
+Rationale: Identifying these risks early helps constrain feature scope within a two-week sprint
 
 ---
 
@@ -407,6 +419,8 @@ Client Sends: GET /api/v1/threads/{threadId}/debate-summary
 | **ML/Clustering** | natural/compromise | Latest   | Position clustering algorithm  |
 | **Job Queue**     | Bull               | 4.x      | Background summary generation  |
 | **Testing**       | Jest               | 29.x     | Unit and integration tests     |
+
+Rationale: Chart.js allows lightweight visualization without overcomplicating the frontend architecture.
 
 ---
 
@@ -547,6 +561,8 @@ Authorization: Bearer {jwt_token}
 
 **Response** (204 No Content)
 
+Rationale: These RESTful endpoints allow scalable extension of analytics features.
+
 ---
 
 ## Public Interfaces
@@ -630,6 +646,8 @@ interface IDebateQualityScorer {
 }
 ```
 
+Rationale: A structured JSON response ensures flexibility in UI rendering.
+
 ---
 
 ## Data Schemas
@@ -706,6 +724,8 @@ Example key: debate_summary:t98765
 }
 ```
 
+Rationale: Storing precomputed metrics reduces repeated aggregation cost.
+
 ---
 
 ## Security and Privacy
@@ -739,6 +759,8 @@ Example key: debate_summary:t98765
 - **CCPA**: Data retention minimized to necessary operational period
 - **AI Transparency**: Disclose AI generation in summary UI ("AI-generated summary")
 
+Rationale: Prevents unauthorized access to moderation tools.
+
 ---
 
 ## Risks to Completion
@@ -761,8 +783,10 @@ Example key: debate_summary:t98765
 6. **Thread Edit Invalidation**: Edited comments not reflected in cached summary
    - _Mitigation_: Invalidate cache on comment edit, maintain activity log
 
-7. **Integration Complexity**: US2 depends on US1 services (AI, cache)
+8. **Integration Complexity**: US2 depends on US1 services (AI, cache)
    - _Mitigation_: Design shared service interfaces early, test dependency chain thoroughly
 
-8. **Moderator Decision Impact**: Summary influences moderation decisions; bias concerns
+9. **Moderator Decision Impact**: Summary influences moderation decisions; bias concerns
    - _Mitigation_: Summary is advisory only, moderators retain full autonomy, transparency about limitations
+
+Rationale: Scope must remain feasible within sprint constraints.
