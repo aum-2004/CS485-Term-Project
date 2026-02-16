@@ -83,44 +83,71 @@ This document specifies the development of the Inline AI Reasoning Summary featu
 ## Class Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ReasoningSummaryService                       │
-├─────────────────────────────────────────────────────────────────┤
-│ - aiAnalysisService: AIAnalysisService                          │
-│ - cacheService: CacheService                                    │
-│ - commentRepository: CommentRepository                          │
-├─────────────────────────────────────────────────────────────────┤
-│ + getSummary(commentId: string): Promise<ReasoningSummary>      │
-│ + generateAndCacheSummary(comment: Comment): Promise<void>      │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                 ┌─────────┴────────┐
-                 │                  │
-┌────────────────▼──────────────┐  ┌▼──────────────────────────────┐
-│    AIAnalysisService          │  │   CacheService               │
-├───────────────────────────────┤  ├──────────────────────────────┤
-│ - openaiClient: OpenAI        │  │ - redisClient: Redis         │
-│ - nlpProcessor: NLPProcessor  │  ├──────────────────────────────┤
-├───────────────────────────────┤  │ + get(key: string): object   │
-│ + extractClaims(text): Claim[]│  │ + set(key: string, value):   │
-│ + extractEvidence(text):      │  │   Promise<void>              │
-│   EvidenceBlock[]             │  │ + delete(key: string):       │
-│ + evaluateCoherence(claims,   │  │   Promise<void>              │
-│   evidence): number           │  │ + exists(key: string): bool  │
-│ + generateSummary(analysis):  │  └──────────────────────────────┘
-│   string                      │
-└────────────────┬─────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                  ReasoningSummaryController                        │
+├────────────────────────────────────────────────────────────────────┤
+│ - reasoningSummaryService: ReasoningSummaryService                │
+├────────────────────────────────────────────────────────────────────┤
+│ + GET /comments/{id}/reasoning-summary(req): Promise<Response>    │
+└────────────────┬─────────────────────────────────────────────────┘
                  │
 ┌────────────────▼────────────────────────────────────────────────┐
-│                  ReasoningSummary (DTO)                          │
-├─────────────────────────────────────────────────────────────────┤
-│ - commentId: string                                              │
-│ - summary: string                                                │
-│ - primaryClaim: string                                           │
-│ - evidenceBlocks: EvidenceBlock[]                               │
-│ - coherenceScore: number (0-1)                                  │
-│ - generatedAt: Date                                              │
-└─────────────────────────────────────────────────────────────────┘
+│                    ReasoningSummaryService                        │
+├────────────────────────────────────────────────────────────────────┤
+│ - aiAnalysisService: AIAnalysisService                            │
+│ - cacheService: CacheService                                      │
+│ - commentRepository: CommentRepository                            │
+│ - reasoningSummaryRepository: ReasoningSummaryRepository          │
+├────────────────────────────────────────────────────────────────────┤
+│ + getSummary(commentId: string): Promise<ReasoningSummary>        │
+│ + generateAndCacheSummary(comment: Comment): Promise<void>        │
+│ + invalidateCache(commentId: string): Promise<void>               │
+└──────────┬──────────────────────┬──────────────────┬─────────────┘
+           │                      │                  │
+    ┌──────▼──────┐    ┌──────────▼────────┐    ┌────▼──────────────┐
+    │AIAnalysis   │    │CacheService      │    │CommentValidator   │
+    │Service      │    ├──────────────────┤    ├───────────────────┤
+    ├─────────────┤    │-redisClient:Redis│    │+ validate(text):  │
+    │-openaiClient│    ├──────────────────┤    │  Promise<bool>    │
+    │-nlpProcessor│    │+ get(key): object│    │+ sanitize(text):  │
+    ├─────────────┤    │+ set(key, value):│    │  string           │
+    │+extractClaims│   │  Promise<void>   │    └───────────────────┘
+    │+extractEvid.│    │+ delete(key):    │
+    │+evaluateCoherence│  Promise<void>  │
+    │+generateSum │    │+ exists(key):bool│
+    └─────┬───────┘    └──────┬──────────┘
+          │                    │
+          └────────┬───────────┘
+                   │
+    ┌──────────────▼──────────────────┐
+    │    ReasoningSummary (DTO)        │
+    ├──────────────────────────────────┤
+    │ - commentId: string               │
+    │ - summary: string                 │
+    │ - primaryClaim: string            │
+    │ - evidenceBlocks: EvidenceBlock[] │
+    │ - coherenceScore: number (0-1)    │
+    │ - generatedAt: Date               │
+    └──────────────┬───────────────────┘
+                   │
+        ┌──────────┼──────────┐
+        │                     │
+    ┌───▼──────┐      ┌──────▼────────┐
+    │ Claim    │      │ EvidenceBlock │
+    ├──────────┤      ├───────────────┤
+    │- id      │      │- type         │
+    │- text    │      │- content      │
+    │- support │      │- strength     │
+    └──────────┘      └───────────────┘
+        │
+┌───────▼─────────┬──────────────────────┬──────────────────┐
+│CommentRepository│ReasoningSummaryRepo  │  NLPProcessor    │
+├─────────────────┤────────────────────────┤──────────────────┤
+│+ getById(id):   │+ save(summary):        │+ tokenize(text):  │
+│  Promise<Cmt>   │  Promise<void>         │  string[]          │
+│+ save(cmt):     │+ update(summary):      │+ parseSentences(): │
+│  Promise<void>  │  Promise<void>         │  Sentence[]        │
+└─────────────────┴────────────────────────┴──────────────────┘
 ```
 
 ---

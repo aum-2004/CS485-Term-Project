@@ -89,69 +89,90 @@ This document specifies the development of the Moderator Debate Summaries featur
 4. If cache miss, API retrieves all comments for thread from PostgreSQL
 5. Thread Analysis Service processes all comments together
 6. Positions are clustered, evidence extracted, quality scored
-7. Summary is cached in Redis for 48 hours
-8. Response returned to client and displayed in moderator panel
+7. PositionMapper transforms database relations (many-to-many position_opponents table) into flat DTO arrays (opponents: ["p1", "p2"])
+8. Summary is cached in Redis for 48 hours
+9. Response returned to client and displayed in moderator panel
 
 ---
 
 ## Class Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ThreadAnalysisService                         │
-├─────────────────────────────────────────────────────────────────┤
-│ - commentRepository: CommentRepository                           │
-│ - threadRepository: ThreadRepository                             │
-│ - aiAnalysisService: AIAnalysisService (shared with US1)        │
-│ - cacheService: CacheService (shared)                           │
-│ - positionClusterer: PositionClusterer                          │
-│ - evidenceExtractor: EvidenceExtractor                          │
-├─────────────────────────────────────────────────────────────────┤
-│ + getDebateSummary(threadId: string): Promise<DebateSummary>    │
-│ + generateThreadSummary(thread: Thread): Promise<void>          │
-│ + invalidateCache(threadId: string): Promise<void>              │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                 ┌─────────┴────────┐
-                 │                  │
-┌────────────────▼──────────────┐  ┌▼────────────────────────────┐
-│   PositionClusterer           │  │  EvidenceExtractor          │
-├───────────────────────────────┤  ├─────────────────────────────┤
-│ - similarityThreshold: number │  │ - aiAnalysisService: ref    │
-├───────────────────────────────┤  ├─────────────────────────────┤
-│ + clusterPositions(           │  │ + extractKeyEvidence(       │
-│   claims: Claim[]             │  │   positions: Position[],    │
-│ ): Position[]                 │  │   comments: Comment[]       │
-│ + calculateSimilarity(        │  │ ): EvidenceAnchor[]         │
-│   claim1, claim2              │  │ + rankEvidence(anchors):    │
-│ ): number                     │  │   EvidenceAnchor[]          │
-└───────────────────────────────┘  └─────────────────────────────┘
-                 │                                │
-                 └─────────────┬──────────────────┘
-                               │
-┌───────────────────────────────▼────────────────────────────────┐
-│                    DebateSummary (DTO)                         │
+┌──────────────────────────────────────────────────────────────────┐
+│                  DebateSummaryController                          │
+├──────────────────────────────────────────────────────────────────┤
+│ - threadAnalysisService: ThreadAnalysisService                  │
+├──────────────────────────────────────────────────────────────────┤
+│ + GET /threads/{id}/debate-summary(req): Promise<Response>       │
+│ + POST /threads/{id}/debate-summary/regenerate(req): Prom<Resp> │
+└────────────────┬─────────────────────────────────────────────────┘
+                 │
+┌────────────────▼──────────────────────────────────────────────┐
+│                    ThreadAnalysisService                       │
 ├──────────────────────────────────────────────────────────────┤
-│ - threadId: string                                            │
-│ - title: string                                               │
-│ - positions: Position[]                                       │
-│ - evidenceAnchors: EvidenceAnchor[]                          │
-│ - disagreementAreas: DisagreementArea[]                      │
-│ - qualityScore: number (0-1)                                 │
-│ - topCommentIds: string[]                                    │
-│ - generatedAt: Date                                          │
-└──────────────────────────────────────────────────────────────┘
-         │                    │                    │
-         │                    │                    │
-    ┌────▼─────┐      ┌───────▼────────┐  ┌────────▼──────┐
-    │ Position │      │ EvidenceAnchor │  │DisagreementArea
-    ├──────────┤      ├────────────────┤  ├─────────────────┤
-    │- id      │      │- id            │  │- position1Id    │
-    │- label   │      │- positionId    │  │- position2Id    │
-    │- claim   │      │- content       │  │- topic          │
-    │- support │      │- strength      │  │- description    │
-    │- opponents│     │- sources       │  │- importanceScore│
-    └──────────┘      └────────────────┘  └─────────────────┘
+│ - commentRepository: CommentRepository                        │
+│ - threadRepository: ThreadRepository                          │
+│ - debateSummaryRepository: DebateSummaryRepository            │
+│ - aiAnalysisService: AIAnalysisService (shared)              │
+│ - cacheService: CacheService (shared)                        │
+│ - positionClusterer: PositionClusterer                       │
+│ - evidenceExtractor: EvidenceExtractor                       │
+│ - disagreementAnalyzer: DisagreementAnalyzer                 │
+│ - debateQualityScorer: DebateQualityScorer                   │
+│ - positionMapper: PositionMapper                             │
+├──────────────────────────────────────────────────────────────┤
+│ + getDebateSummary(threadId): Promise<DebateSummary>         │
+│ + generateThreadSummary(thread): Promise<void>               │
+│ + invalidateCache(threadId): Promise<void>                   │
+└──────────┬──────────┬──────────┬──────────┬──────────────────┘
+           │          │          │          │
+      ┌────▼───┐  ┌───▼────┐ ┌──▼────┐ ┌──▼─────────┐  ┌─────────────┐
+      │Position│  │Evidence│ │Disagr.│ │DebateQuali│  │PositionMapp│
+      │Cluster.│  │Extract.│ │Analyzer│ │Scorer     │  │er           │
+      ├────────┤  ├────────┤ ├───────┤ ├───────────┤  ├─────────────┤
+      │-simThr │  │-aiAnal │ │-aiAnal│ │-avgCohere.│  │+ mapPositio│
+      ├────────┤  │Service │ │Service│ ├───────────┤  │  nsToDTO():│
+      │+cluster│  ├────────┤ ├───────┤ │+scoreQuali│  │  DTO[]      │
+      │Positns │  │+extract│ │+identif│ │ty()       │  │+ mapEviden│
+      │+calcSim│  │KeyEvid.│ │Disagr.│ │           │  │ceToDTO():  │
+      │ilarity │  │+rankEvd│ │+findKey│ │           │  │DTO[]       │
+      └────┬───┘  └────┬───┘ │Conflicts│ └────┬──────┘  └────┬──────┘
+           │           │     └───┬─────┘      │             │
+           │           │         │            └─────┬───────┘
+           └─────────┬─┴─────────┘                  │
+                     │
+    ┌────────────────▼──────────────────────────┐
+    │        DebateSummary (DTO)                 │
+    ├──────────────────────────────────────────┤
+    │ - threadId: string                        │
+    │ - title: string                           │
+    │ - positions: Position[]                   │
+    │ - evidenceAnchors: EvidenceAnchor[]       │
+    │ - disagreementAreas: DisagreementArea[]   │
+    │ - qualityScore: number (0-1)              │
+    │ - topCommentIds: string[]                 │
+    │ - generatedAt: Date                       │
+    └────────┬──────────┬───────────┬──────────┘
+             │          │           │
+       ┌─────▼──┐  ┌────▼──────┐ ┌─▼──────────────┐
+       │Position │  │EvidAnchor │ │DisagreementArea│
+       ├────────┤  ├───────────┤ ├────────────────┤
+       │-id     │  │-id        │ │-position1Id    │
+       │-label  │  │-positionId│ │-position2Id    │
+       │-claim  │  │-content   │ │-topic          │
+       │-support│  │-strength  │ │-description    │
+       │-opponents│ │-sources   │ │-importanceScore│
+       └────┬───┘  │-comtCount │ └────────────────┘
+            │      └───────────┘
+            │
+    ┌───────┴──────────┬──────────────┬──────────────┐
+    │ThreadRepository  │CommentRepos. │DebateSummRepo│
+    ├─────────────────┤──────────────┤──────────────┤
+    │+ getById(id):   │+ getById(id):│+ save(summ):│
+    │  Promise<Thread>│  Prom<Comment>│ Prom<void> │
+    │+ save(thread):  │+ getByThread │+ update(sum)│
+    │  Promise<void>  │  Id(id): Prom│: Prom<void> │
+    └─────────────────┴──────────────┴──────────────┘
 ```
 
 ---
@@ -166,6 +187,7 @@ This document specifies the development of the Moderator Debate Summaries featur
 | `EvidenceExtractor`       | services     | Identifies and ranks supporting evidence per position            |
 | `DisagreementAnalyzer`    | services     | Identifies where positions fundamentally disagree                |
 | `DebateQualityScorer`     | services     | Computes overall debate quality metric                           |
+| `PositionMapper`          | services     | Transforms database relations to DTOs (many-to-many to arrays)   |
 | `AIAnalysisService`       | services     | Shared AI service for claims/evidence extraction (from US1)      |
 | `CacheService`            | services     | Shared Redis cache management (from US1)                         |
 | `DebateSummary`           | models/dtos  | Data Transfer Object for thread summary response                 |
@@ -371,20 +393,20 @@ Client Sends: GET /api/v1/threads/{threadId}/debate-summary
 
 ## Technology Stack
 
-| Layer             | Technology  | Version  | Purpose                        |
-| ----------------- | ----------- | -------- | ------------------------------ |
-| **Frontend**      | React       | 18.x     | Moderator dashboard UI         |
-| **Frontend**      | TypeScript  | 5.x      | Type safety                    |
-| **Frontend**      | Material-UI | 5.x      | Pre-built moderator components |
-| **Backend**       | Node.js     | 18.x LTS | Runtime                        |
-| **Backend**       | Express.js  | 4.x      | HTTP API framework             |
-| **Backend**       | TypeScript  | 5.x      | Type safety                    |
-| **AI Service**    | OpenAI API  | GPT-4    | Batch comment analysis         |
-| **Database**      | PostgreSQL  | 14+      | Primary store                  |
-| **Cache**         | Redis       | 7.x      | Summary cache (48h TTL)        |
-| **ML/Clustering** | natural     | Latest   | Position clustering algorithm  |
-| **Job Queue**     | Bull        | 4.x      | Background summary generation  |
-| **Testing**       | Jest        | 29.x     | Unit and integration tests     |
+| Layer             | Technology         | Version  | Purpose                        |
+| ----------------- | ------------------ | -------- | ------------------------------ |
+| **Frontend**      | React              | 18.x     | Moderator dashboard UI         |
+| **Frontend**      | TypeScript         | 5.x      | Type safety                    |
+| **Frontend**      | Material-UI        | 5.x      | Pre-built moderator components |
+| **Backend**       | Node.js            | 18.x LTS | Runtime                        |
+| **Backend**       | Express.js         | 4.x      | HTTP API framework             |
+| **Backend**       | TypeScript         | 5.x      | Type safety                    |
+| **AI Service**    | OpenAI API         | GPT-4    | Batch comment analysis         |
+| **Database**      | PostgreSQL         | 14+      | Primary store                  |
+| **Cache**         | Redis              | 7.x      | Summary cache (48h TTL)        |
+| **ML/Clustering** | natural/compromise | Latest   | Position clustering algorithm  |
+| **Job Queue**     | Bull               | 4.x      | Background summary generation  |
+| **Testing**       | Jest               | 29.x     | Unit and integration tests     |
 
 ---
 
@@ -497,6 +519,26 @@ Authorization: Bearer {jwt_token}
 ```
 
 #### 3. Delete Cached Summary
+
+```http
+DELETE /api/v1/threads/{threadId}/debate-summary
+Authorization: Bearer {jwt_token}
+```
+
+**Response** (200 OK):
+
+```json
+{
+  "message": "Debate summary deleted successfully",
+  "threadId": "t98765"
+}
+```
+
+**Error Responses**:
+
+- `400 Bad Request`: Invalid threadId format
+- `404 Not Found`: Summary does not exist
+- `500 Internal Server Error`: Deletion failure
 
 ```http
 DELETE /api/v1/threads/{threadId}/debate-summary

@@ -36,18 +36,18 @@ This document specifies the development of the Real-Time Writing Feedback featur
 │  │  └───────────────────────────────────────────────┘ │  │
 │  └────────────────────────────────────────────────────┘  │
 └──────────────────────┬──────────────────────────────────┘
-                       │ WebSocket + HTTP
+                       │ HTTP & WebSocket (Socket.IO)
                        │ (Debounced, ~500ms)
                        │ POST /api/v1/composer/draft-feedback
-                       │ { draftText: "...", position: 5 }
+                       │ WS /socket.io/ (rooms: composer:{userId})
                        │ Response: { feedback: [...] }
                        ▼
 ┌────────────────────────────────────────────────────────┐
-│            Backend Server (Node.js + WebSocket)        │
+│            Backend Server (Node.js + Socket.IO)        │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │  API Routes & WebSocket Handlers                │  │
 │  │  - POST /api/v1/composer/draft-feedback         │  │
-│  │  - WS /ws/composer/{userId}                     │  │
+│  │  - Socket.IO namespace /composer (room per user)│  │
 │  └────────────────┬─────────────────────────────────┘  │
 │                   │                                     │
 │  ┌────────────────▼─────────────────────────────────┐  │
@@ -105,62 +105,80 @@ This document specifies the development of the Real-Time Writing Feedback featur
 ## Class Diagram
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│              WritingFeedbackService                      │
-├─────────────────────────────────────────────────────────┤
-│ - aiAnalysisService: AIAnalysisService (shared)         │
-│ - circularLogicDetector: CircularLogicDetector          │
-│ - cacheService: CacheService (shared)                   │
-│ - draftRepository: DraftRepository                      │
-├─────────────────────────────────────────────────────────┤
-│ + analyzeDraft(text: string): Promise<FeedbackResult>   │
-│ + detectCircularLogic(draft: string): Promise<Issue[]>  │
-│ + detectWeakEvidence(draft: string): Promise<Issue[]>   │
-│ + detectUnsupportedClaims(draft: string): Promise<...>  │
-│ + aggregateFeedback(issues: Issue[]): FeedbackResult    │
-└──────────────┬──────────────────────────────────────────┘
-               │
-     ┌─────────┴────────┬──────────────┐
-     │                  │              │
-┌────▼────────────┐   ┌─▼──────────────────┐   ┌┴──────────────────┐
-│CircularLogic    │   │WeakEvidenceDetector│   │UnsupportedClaims  │
-│Detector         │   │                    │   │Detector           │
-├─────────────────┤   ├────────────────────┤   ├───────────────────┤
-│- ngramStore     │   │- keywordPatterns   │   │- logicalFallacies │
-│- sentenceGraph  │   │- citationParser    │   │- claimAnalyzer    │
-├─────────────────┤   ├────────────────────┤   ├───────────────────┤
-│+ detect(text):  │   │+ detect(text):     │   │+ detect(text):    │
-│  Issue[]        │   │  Issue[]           │   │  Issue[]          │
-│+ buildGraph():  │   │+ extractCitations()│   │+ validateClaims() │
-│  Graph          │   │+ scoreCitation()   │   │+ checkLogic()     │
-└─────────────────┘   └────────────────────┘   └───────────────────┘
-     │                  │                             │
-     └──────────────────┴─────────────────────────────┘
-                        │
-                        ▼
-            ┌───────────────────────┐
-            │   FeedbackResult      │
-            ├───────────────────────┤
-            │- issues: Issue[]      │
-            │- score: number (0-1)  │
-            │- suggestions: string[]│
-            │- goodPoints: string[] │
-            │- confidence: number   │
-            └───────────────────────┘
-                        │
-       ┌────────────────┴────────────────┐
-       │                                 │
-    ┌──▼─────────────┐          ┌─────────▼──────┐
-    │  Issue         │          │  Suggestion    │
-    ├────────────────┤          ├────────────────┤
-    │- type          │          │- text          │
-    │- position      │          │- type          │
-    │- lineNumber    │          │- priority      │
-    │- flaggedText   │          │- exampleFix    │
-    │- explanation   │          │- docLink       │
-    │- severity      │          └────────────────┘
-    │- confidence    │
-    └────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                            WritingFeedbackController                                                   │
+├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ - writingFeedbackService: WritingFeedbackService                                                       │
+├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ + POST /composer/draft-feedback(req): Promise<Response>                                                │
+│ + GET /composer/feedback-history(req): Promise<Response>                                               │
+└─────────────────────────────────────────────────────────┬──────────────────────────────────────────────┘
+                                                          │
+┌──────────────────────────────────────────────────────────▼──────────────────────────────────────────────┐
+│                         WritingFeedbackService                                                        │
+├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ - aiAnalysisService: AIAnalysisService (shared)       - circularLogicDetector: CircularLogicDetector  │
+│ - weakEvidenceDetector: WeakEvidenceDetector          - unsupportedClaimsDetector: UnsupportedClaims  │
+│ - cacheService: CacheService (shared)                 - draftRepository: DraftRepository              │
+│ - feedbackLogRepository: FeedbackLogRepository        - writingFeedbackCache: WritingFeedbackCache    │
+├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ + analyzeDraft(text): Promise<FeedbackResult>         + detectCircularLogic(draft): Promise<Issue[]>  │
+│ + detectWeakEvidence(draft): Promise<Issue[]>         + detectUnsupportedClaims(draft): Promise<...>  │
+│ + aggregateFeedback(issues): FeedbackResult                                                           │
+└──┬────────────────────────────────────────────────────┬────────────────────────────────┬──────────────┘
+   │                                                    │                                │
+   │                                    ┌───────────────┼────────────────────────────────┤
+   │                                    │               │                                │
+   ▼                                    ▼               ▼                                ▼
+┌──────────────────────┐  ┌─────────────────────────┐  ┌──────────────────────┐  ┌─────────────────────┐
+│CircularLogic        │  │WeakEvidenceDetector    │  │UnsupportedClaims    │  │CitationParser      │
+│Detector             │  ├──────────────────────────┤  │Detector             │  ├──────────────────────┤
+├──────────────────────┤  │- keywordPatterns       │  ├──────────────────────┤  │+ extractCitations()│
+│- ngramStore         │  │- citationParser (ref)  │  │- logicalFallacies   │  │  : Citation[]      │
+│- sentenceGraph      │  ├──────────────────────────┤  ├──────────────────────┤  │+ scoreCitation()   │
+├──────────────────────┤  │+ detect(text):         │  │+ detect(text):      │  └──────────────────────┘
+│+ detect(text):      │  │  Issue[]               │  │  Issue[]            │
+│  Issue[]            │  │+ extractCitations()    │  │+ validateClaims()   │  ┌─────────────────────┐
+│+ buildGraph():      │  │+ scoreCitation()       │  │+ checkLogic()       │  │SentenceGraphBuilder │
+│  Graph              │  │+ rankEvidence()        │  └──────────────────────┘  ├──────────────────────┤
+└──────┬───────────────┘  └──────────┬─────────────┘                           │+ buildGraph()      │
+       │                             │                                         │+ calcDeps()        │
+       │                             │                                         └──────┬──────────────┘
+       │                  ┌──────────┴──────────────┐                                │
+       │                  │                         │                                │
+       └──────────────────┼──────────────┬──────────┴────────────────────┬──────────┘
+                          │              │                               │
+                    ┌─────▼────────────┐ │           ┌──────────────────▼─────────┐
+                    │ FeedbackResult   │ │           │  WritingFeedbackCache      │
+                    ├──────────────────┤ │           ├────────────────────────────┤
+                    │- issues: Issue[] │ │           │+ getCacheKey()             │
+                    │- score: number   │ │           │+ hashDraft()               │
+                    │- suggestions:[]  │ │           │+ buildKey()                │
+                    │- goodPoints: []  │ │           └────────────────────────────┘
+                    │- confidence: no. │ │
+                    │- generatedAt:Dat│ │
+                    └────────┬─────────┘ │
+                             │           │
+                    ┌────────▼─────┐    ┌▼──────────────────┐
+                    │Issue         │    │Suggestion        │
+                    ├──────────────┤    ├──────────────────┤
+                    │- type        │    │- text            │
+                    │- position    │    │- type            │
+                    │- lineNumber  │    │- priority        │
+                    │- flaggedText │    │- exampleFix      │
+                    │- explanation │    │- docLink         │
+                    │- severity    │    └──────────────────┘
+                    │- confidence  │
+                    └──────────────┘   ┌───────────────────────────┬───────────────────────────┬──────────────┐
+                                       │                           │                           │              │
+                                    ┌──▼──────────────┐  ┌────────▼──────────┐  ┌────────────▼─────────┐
+                                    │DraftRepository  │  │FeedbackLogRepo    │  │AIAnalysisService     │
+                                    ├─────────────────┤  ├───────────────────┤  ├──────────────────────┤
+                                    │+ save(draft):   │  │+ save(log):       │  │+ extractClaims()     │
+                                    │  Promise<void>  │  │  Promise<void>    │  │+ extractEvidence()   │
+                                    │+ getById(id):   │  │+ getByUser():     │  │+ evaluateCoherence() │
+                                    │  Promise<Draft> │  │  Promise<Log[]>   │  │+ generateSummary()   │
+                                    └─────────────────┘  └───────────────────┘  └──────────────────────┘
 ```
 
 ---
@@ -180,6 +198,7 @@ This document specifies the development of the Real-Time Writing Feedback featur
 | `FeedbackLogRepository`     | repositories | Database access for feedback history             |
 | `FeedbackResult`            | models/dtos  | Container for feedback analysis output           |
 | `Issue`                     | models       | Represents a single problem detected in draft    |
+| `Suggestion`                | models       | Represents a suggestion for improving draft      |
 | `WritingFeedbackCache`      | utils        | Efficient cache key management                   |
 | `CitationParser`            | utils        | Extracts citations and source references         |
 | `SentenceGraphBuilder`      | utils        | Constructs argument dependency graph             |
@@ -477,9 +496,27 @@ Authorization: Bearer {jwt_token}
   ],
   "score": 0.62,
   "suggestions": [
-    "Add a specific citation (e.g., 'IPCC 6th Assessment' or link to meta-analysis)",
-    "Remove repeated argument or expand it with new evidence",
-    "Consider addressing the strongest counterargument in the opposing thread"
+    {
+      "text": "Add a specific citation (e.g., 'IPCC 6th Assessment' or link to meta-analysis)",
+      "type": "reference",
+      "priority": "high",
+      "exampleFix": "'According to the IPCC 6th Assessment Report (2023)...'",
+      "docLink": "https://example.com/docs/evidence-best-practices"
+    },
+    {
+      "text": "Remove repeated argument or expand it with new evidence",
+      "type": "structure",
+      "priority": "medium",
+      "exampleFix": "Move this to a separate paragraph with new supporting points",
+      "docLink": "https://example.com/docs/argument-organization"
+    },
+    {
+      "text": "Consider addressing the strongest counterargument in the opposing thread",
+      "type": "clarity",
+      "priority": "medium",
+      "exampleFix": "'While some argue that natural cycles dominate, the evidence shows...'",
+      "docLink": "https://example.com/docs/counterargument-handling"
+    }
   ],
   "goodPoints": [
     "Clear assertion of main position",
@@ -587,7 +624,7 @@ socket.on('feedback:result', (data: {
   feedbackId: string,
   issues: Issue[],
   score: number,
-  suggestions: string[],
+  suggestions: Suggestion[],
   goodPoints: string[]
 }));
 
@@ -623,15 +660,15 @@ interface ComposerWithFeedbackProps {
 
 // FeedbackResult DTO
 interface FeedbackResult {
-  issues: WritingIssue[];
+  issues: Issue[];
   score: number; // 0 to 1
-  suggestions: string[];
+  suggestions: Suggestion[];
   goodPoints: string[];
   confidence: number; // 0 to 1
   generatedAt: Date;
 }
 
-interface WritingIssue {
+interface Issue {
   type:
     | "circular_logic"
     | "weak_evidence"
@@ -644,6 +681,14 @@ interface WritingIssue {
   severity: "low" | "medium" | "high";
   confidence: number; // 0 to 1
 }
+
+interface Suggestion {
+  text: string;
+  type: "improvement" | "reference" | "structure" | "clarity";
+  priority: "high" | "medium" | "low";
+  exampleFix: string;
+  docLink?: string;
+}
 ```
 
 ### Backend Service Interfaces
@@ -651,25 +696,25 @@ interface WritingIssue {
 ```typescript
 interface IWritingFeedbackService {
   analyzeDraft(text: string, context: AnalysisContext): Promise<FeedbackResult>;
-  detectCircularLogic(text: string): Promise<WritingIssue[]>;
-  detectWeakEvidence(text: string): Promise<WritingIssue[]>;
-  detectUnsupportedClaims(text: string): Promise<WritingIssue[]>;
+  detectCircularLogic(text: string): Promise<Issue[]>;
+  detectWeakEvidence(text: string): Promise<Issue[]>;
+  detectUnsupportedClaims(text: string): Promise<Issue[]>;
 }
 
 interface ICircularLogicDetector {
-  detect(text: string): Promise<WritingIssue[]>;
+  detect(text: string): Promise<Issue[]>;
   buildArgumentGraph(text: string): Promise<Graph>;
   findRepeatedArguments(sentences: string[]): Promise<Repetition[]>;
 }
 
 interface IWeakEvidenceDetector {
-  detect(text: string): Promise<WritingIssue[]>;
+  detect(text: string): Promise<Issue[]>;
   extractCitations(text: string): Promise<Citation[]>;
   scoreCitation(citation: Citation): Promise<number>;
 }
 
 interface IUnsupportedClaimsDetector {
-  detect(text: string): Promise<WritingIssue[]>;
+  detect(text: string): Promise<Issue[]>;
   validateClaims(claims: Claim[]): Promise<ClaimValidation[]>;
   checkLogicalFallacies(text: string): Promise<Fallacy[]>;
 }
