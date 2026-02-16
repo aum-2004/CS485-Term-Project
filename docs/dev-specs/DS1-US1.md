@@ -8,6 +8,21 @@ This document specifies the development of the Inline AI Reasoning Summary featu
 
 **T-Shirt Size**: Small
 
+Rationale: The fact that users leave lengthy Reddit threads because of repetition and buried, excellent arguments is directly addressed by this feature. It must be put into practice first since it is the cornerstone of the product's value proposition.
+LLM Interaction:
+Prompt: Generate a development specification header for an inline AI debate summary feature including sprint assignment, priority, and dependencies.
+Response:
+Feature Name: Inline AI Debate Summary
+User Story: As a Reddit reader, I want to see an AI-generated reasoning-based summary of a discussion so that I can quickly understand the strongest arguments without reading the entire thread.
+Sprint Assignment: Sprint 1 (2-week sprint)
+	Priority: High
+	Dependencies: None
+Description:
+The Inline AI Debate Summary feature analyzes Reddit discussion threads using a large language model to extract key arguments, opposing viewpoints, and reasoning quality indicators. The feature generates a structured summary that appears within the thread interface, allowing users to quickly understand the substance of the debate without reading all comments.
+Justification:
+This feature addresses the core user pain point identified during interviews: difficulty navigating long threads and identifying high-quality arguments. It serves as the foundational capability upon which other AI-assisted features will build.
+
+
 ---
 
 ## Architecture Diagram
@@ -77,6 +92,8 @@ This document specifies the development of the Inline AI Reasoning Summary featu
 5. AI Analysis Service processes comment text
 6. Summary is cached in Redis for subsequent requests
 7. Response returned to client and displayed
+
+Rationale: Separation of concerns is ensured by a layered architecture. To safeguard API keys, AI processing is managed on the server side. Redis improves response latency and lowers API costs.
 
 ---
 
@@ -149,6 +166,7 @@ This document specifies the development of the Inline AI Reasoning Summary featu
 │  Promise<void>  │  Promise<void>         │  Sentence[]        │
 └─────────────────┴────────────────────────┴──────────────────┘
 ```
+Rationale: Every class adheres to the principles of single responsibility. By separating LLM interaction, AIAnalyzer avoids a close coupling between AI logic and controllers.
 
 ---
 
@@ -168,7 +186,10 @@ This document specifies the development of the Inline AI Reasoning Summary featu
 | `NLPProcessor`               | utils        | Natural Language Processing utilities                  |
 | `CommentValidator`           | utils        | Validation for comment text input                      |
 
+Rationale: Certain listing makes sure that there is consistency in the implementation and that there is no mismatch between the diagram and the actual system elements.
+
 ---
+
 
 ## State Diagrams
 
@@ -219,6 +240,8 @@ This document specifies the development of the Inline AI Reasoning Summary featu
        │ Idle                  │
        └───────────────────────┘
 ```
+Rationale: This state model supports future streaming updates and also enables asynchronous processing behaviour to be better understood.
+
 
 ---
 
@@ -292,6 +315,8 @@ Panel Below Comment
   can be replaced with on-premise model later
 ```
 
+	Rationale: This flow prioritizes performance as well as cost optimization.
+
 ---
 
 ## Development Risks and Failures
@@ -306,6 +331,8 @@ Panel Below Comment
 | **Dependency on OpenAI**     | Medium     | Service unavailable if OpenAI down      | Graceful degradation, fallback handler, monitoring/alerting                   |
 | **Scalability**              | Medium     | High traffic overwhelms Redis/DB        | Horizontal scaling plan, read replicas, consider distributed cache            |
 | **Coherence Score Accuracy** | Medium     | Misleading quality scores               | Validate with domain experts, collect user feedback, iterate                  |
+
+Rationale: Risk identification is done early, where mitigation planning is done in the context of a sprint.
 
 ---
 
@@ -324,6 +351,9 @@ Panel Below Comment
 | **NLP**        | natural/compromise | Latest   | Optional local NLP fallback                 |
 | **Testing**    | Jest               | 29.x     | Unit and integration testing                |
 | **Async**      | Bull               | 4.x      | Job queue for background summary generation |
+
+
+Rationale: Stack chosen for scalability, rapid development, and AI integration compatibility.
 
 ---
 
@@ -368,6 +398,8 @@ Authorization: Bearer {jwt_token}
 - `429 Too Many Requests`: Rate limit exceeded
 - `500 Internal Server Error`: Processing error
 
+Rationale: RESTful endpoints allow modular expansion for future AI features
+
 ---
 
 ## Public Interfaces
@@ -400,6 +432,7 @@ interface EvidenceBlock {
 }
 ```
 
+
 ### Backend Service Interfaces
 
 ```typescript
@@ -419,6 +452,8 @@ interface IAIAnalysisService {
   generateSummary(analysis: AnalysisResult): Promise<string>;
 }
 ```
+
+Rationale: Structured JSON supports flexible frontend rendering.
 
 ---
 
@@ -475,6 +510,7 @@ Example key: reasoning_summary:c12345
   "generatedAt": "2026-02-11T10:30:00Z"
 }
 ```
+Rationale: Normalized storage prevents redundancy.
 
 ---
 
@@ -506,6 +542,8 @@ Example key: reasoning_summary:c12345
 - **CCPA**: Data retention policy complies with minimum necessary principle
 - **AI Transparency**: Clear disclosure that summaries are AI-generated
 
+Rationale: Ensures compliance with best practices
+
 ---
 
 ## Risks to Completion
@@ -527,3 +565,5 @@ Example key: reasoning_summary:c12345
 
 6. **Evaluation Metrics**: Difficult to measure summary quality objectively
    - _Mitigation_: User satisfaction surveys, benchmark against human reviewers
+
+Rationale: Keeps sprint achievable within 2 weeks.
