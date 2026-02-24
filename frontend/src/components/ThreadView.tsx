@@ -1,52 +1,94 @@
 import { useEffect, useState } from "react";
 import CommentCard from "./CommentCard";
+import {
+  getComments,
+  sortCommentsByScore
+} from "../services/commentService";
 import type { Comment } from "../types/Comment";
-import { fetchThreadComments } from "../services/commentService";
 
-const ThreadView = () => {
+interface ThreadViewProps {
+  sortByScore: boolean;
+  mode: "success" | "loading" | "empty" | "error";
+}
+
+const ThreadView = ({ sortByScore, mode }: ThreadViewProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
-  const [sortByScore, setSortByScore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadComments = async () => {
-      const data = await fetchThreadComments("thread-123");
-      setComments(data);
-      setLoading(false);
+    const fetchComments = async () => {
+      try {
+        setLoading(true);
+        const data = await getComments();
+        setComments(data);
+        setError(null);
+      } catch {
+        setError("Failed to load comments.");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    loadComments();
-  }, []);
+    if (mode === "success") {
+      fetchComments();
+    } else {
+      setLoading(false);
+      setComments([]);
+      setError(null);
+    }
+  }, [mode]);
 
-  const sortedComments = sortByScore
-    ? [...comments].sort((a, b) => b.reasoningScore - a.reasoningScore)
-    : comments;
-
-  if (loading) {
-    return <p>Loading comments...</p>;
+  if (mode === "loading") {
+    return (
+      <p className="text-center py-10 text-gray-400 animate-pulse">
+        Loading comments...
+      </p>
+    );
   }
 
-  return (
-    <div>
-      <button
-        onClick={() => setSortByScore(!sortByScore)}
-        style={{
-          padding: "0.6rem 1rem",
-          backgroundColor: "#3a3a3a",
-          color: "#ffffff",
-          border: "1px solid #555",
-          borderRadius: "6px",
-          cursor: "pointer"
-        }}
-      >
-        {sortByScore ? "Default Order" : "Sort by Reasoning Score"}
-      </button>
+  if (mode === "error") {
+    return (
+      <p className="text-center py-10 text-red-500">
+        Failed to load comments.
+      </p>
+    );
+  }
 
-      <div style={{ marginTop: "1.5rem" }}>
-        {sortedComments.map((comment) => (
-          <CommentCard key={comment.id} comment={comment} />
-        ))}
-      </div>
+  if (mode === "empty") {
+    return (
+      <p className="text-center py-10 text-gray-400">
+        No comments available.
+      </p>
+    );
+  }
+
+  if (loading) {
+    return (
+      <p className="text-center py-10 text-gray-400">
+        Loading comments...
+      </p>
+    );
+  }
+
+  const displayedComments = sortByScore
+    ? sortCommentsByScore(comments)
+    : comments;
+
+  const maxScore =
+    comments.length > 0
+      ? Math.max(...comments.map((c) => c.reasoningScore))
+      : 0;
+
+  return (
+    <div className="space-y-10">
+      {displayedComments.map((comment) => (
+        <CommentCard
+          key={comment.id}
+          comment={comment}
+          isTopReasoning={comment.reasoningScore === maxScore}
+        />
+      ))}
     </div>
   );
 };
