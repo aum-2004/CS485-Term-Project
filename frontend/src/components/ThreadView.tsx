@@ -7,11 +7,12 @@ import {
 import type { Comment } from "../types/Comment";
 
 interface ThreadViewProps {
+  threadId: string;
   sortByScore: boolean;
   mode: "success" | "loading" | "empty" | "error";
 }
 
-const ThreadView = ({ sortByScore, mode }: ThreadViewProps) => {
+const ThreadView = ({ threadId, sortByScore, mode }: ThreadViewProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +21,7 @@ const ThreadView = ({ sortByScore, mode }: ThreadViewProps) => {
     const fetchComments = async () => {
       try {
         setLoading(true);
-        const data = await getComments();
+        const data = await getComments(threadId);
         setComments(data);
         setError(null);
       } catch {
@@ -30,14 +31,14 @@ const ThreadView = ({ sortByScore, mode }: ThreadViewProps) => {
       }
     };
 
-    if (mode === "success") {
+    if (mode === "success" && threadId) {
       fetchComments();
     } else {
       setLoading(false);
       setComments([]);
       setError(null);
     }
-  }, [mode]);
+  }, [mode, threadId]);
 
   if (mode === "loading") {
     return (
@@ -63,6 +64,14 @@ const ThreadView = ({ sortByScore, mode }: ThreadViewProps) => {
     );
   }
 
+  if (!threadId) {
+    return (
+      <p className="text-center py-10 text-gray-500">
+        Paste a Reddit thread URL above to get started.
+      </p>
+    );
+  }
+
   if (loading) {
     return (
       <p className="text-center py-10 text-gray-400">
@@ -75,10 +84,12 @@ const ThreadView = ({ sortByScore, mode }: ThreadViewProps) => {
     ? sortCommentsByScore(comments)
     : comments;
 
+  // Only consider analysed comments for the "Top Reasoning" badge
+  const analysedComments = comments.filter((c) => !!c.analyzedAt);
   const maxScore =
-    comments.length > 0
-      ? Math.max(...comments.map((c) => c.reasoningScore))
-      : 0;
+    analysedComments.length > 0
+      ? Math.max(...analysedComments.map((c) => c.reasoningScore))
+      : -1;
 
   return (
     <div className="space-y-10">
@@ -86,7 +97,7 @@ const ThreadView = ({ sortByScore, mode }: ThreadViewProps) => {
         <CommentCard
           key={comment.id}
           comment={comment}
-          isTopReasoning={comment.reasoningScore === maxScore}
+          isTopReasoning={!!comment.analyzedAt && comment.reasoningScore === maxScore}
         />
       ))}
     </div>

@@ -1,49 +1,47 @@
 import { useEffect, useState } from "react";
 
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+
+interface SummaryData {
+  mainPositions: string[];
+  supportingEvidence: string[];
+  areasOfDisagreement: string[];
+}
+
 interface DebateSummaryModalProps {
+  threadId: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const DebateSummaryModal = ({ isOpen, onClose }: DebateSummaryModalProps) => {
+const DebateSummaryModal = ({ threadId, isOpen, onClose }: DebateSummaryModalProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [summary, setSummary] = useState<string | null>(null);
+  const [summary, setSummary] = useState<SummaryData | null>(null);
 
-  const generateSummary = () => {
+  const fetchSummary = async () => {
     setLoading(true);
     setError(false);
     setSummary(null);
-
-    setTimeout(() => {
-      // Simulate 80% success rate
-      if (Math.random() > 0.2) {
-        setSummary(`
-Main Positions:
-• One side argues the study establishes causal inference using longitudinal design and statistical controls.
-• The opposing side argues the sample bias and publication bias weaken the conclusions.
-
-Strongest Supporting Evidence:
-• Multivariate regression with p < 0.01
-• 5-year longitudinal temporal precedence
-
-Areas of Disagreement:
-• Generalizability of findings
-• Representativeness of sample population
-• Impact of publication bias
-        `);
-      } else {
-        setError(true);
-      }
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/threads/${threadId}/summary`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data: SummaryData = await response.json();
+      setSummary(data);
+    } catch {
+      setError(true);
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   useEffect(() => {
     if (isOpen) {
-      generateSummary();
+      fetchSummary();
     }
-  }, [isOpen]);
+  }, [isOpen, threadId]);
 
   if (!isOpen) return null;
 
@@ -79,7 +77,7 @@ Areas of Disagreement:
               Failed to generate summary.
             </p>
             <button
-              onClick={generateSummary}
+              onClick={fetchSummary}
               className="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium w-fit"
             >
               Retry
@@ -88,9 +86,32 @@ Areas of Disagreement:
         )}
 
         {!loading && !error && summary && (
-          <pre className="text-gray-300 whitespace-pre-wrap leading-relaxed text-sm">
-            {summary}
-          </pre>
+          <div className="flex flex-col gap-6 text-sm text-gray-300">
+            <section>
+              <h4 className="text-blue-400 font-semibold mb-2">Main Positions</h4>
+              <ul className="list-disc list-inside space-y-1">
+                {summary.mainPositions.map((p, i) => (
+                  <li key={i}>{p}</li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h4 className="text-green-400 font-semibold mb-2">Strongest Supporting Evidence</h4>
+              <ul className="list-disc list-inside space-y-1">
+                {summary.supportingEvidence.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h4 className="text-red-400 font-semibold mb-2">Areas of Disagreement</h4>
+              <ul className="list-disc list-inside space-y-1">
+                {summary.areasOfDisagreement.map((d, i) => (
+                  <li key={i}>{d}</li>
+                ))}
+              </ul>
+            </section>
+          </div>
         )}
       </div>
     </div>
