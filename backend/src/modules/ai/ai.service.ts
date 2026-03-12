@@ -126,28 +126,20 @@ JSON format (use these exact keys):
 
 Base every item specifically on the actual comment content above.`;
 
-    try {
-      const parsed = await withRetry(async () => {
-        const result = await model.generateContent(prompt);
-        return extractJson(result.response.text());
-      });
+    // Let errors propagate — callers must NOT persist failed results
+    const parsed = await withRetry(async () => {
+      const result = await model.generateContent(prompt);
+      return extractJson(result.response.text());
+    });
 
-      const data = parsed as Partial<DebateSummaryData>;
-      return {
-        mainPositions: Array.isArray(data.mainPositions) && data.mainPositions.length
-          ? data.mainPositions : ["Multiple perspectives were expressed."],
-        supportingEvidence: Array.isArray(data.supportingEvidence) && data.supportingEvidence.length
-          ? data.supportingEvidence : ["See individual comments for details."],
-        areasOfDisagreement: Array.isArray(data.areasOfDisagreement) && data.areasOfDisagreement.length
-          ? data.areasOfDisagreement : ["Participants disagreed on key points."],
-      };
-    } catch (err) {
-      console.warn("[AI] generateDebateSummary failed:", (err as Error).message.substring(0, 150));
-      return {
-        mainPositions: ["Multiple perspectives were shared in this discussion."],
-        supportingEvidence: ["See individual comments for details."],
-        areasOfDisagreement: ["Participants disagreed on key aspects of the topic."],
-      };
-    }
+    const data = parsed as Partial<DebateSummaryData>;
+    return {
+      mainPositions: Array.isArray(data.mainPositions) && data.mainPositions.length
+        ? data.mainPositions : ["Multiple perspectives were expressed."],
+      supportingEvidence: Array.isArray(data.supportingEvidence) && data.supportingEvidence.length
+        ? data.supportingEvidence : ["See individual comments for details."],
+      areasOfDisagreement: Array.isArray(data.areasOfDisagreement) && data.areasOfDisagreement.length
+        ? data.areasOfDisagreement : ["Participants disagreed on key points."],
+    };
   }
 }

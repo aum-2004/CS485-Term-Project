@@ -16,22 +16,25 @@ interface DebateSummaryModalProps {
 
 const DebateSummaryModal = ({ threadId, isOpen, onClose }: DebateSummaryModalProps) => {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [summary, setSummary] = useState<SummaryData | null>(null);
 
   const fetchSummary = async () => {
     setLoading(true);
-    setError(false);
+    setErrorMsg(null);
     setSummary(null);
     try {
       const response = await fetch(
         `${API_BASE}/api/threads/${threadId}/summary`
       );
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data: SummaryData = await response.json();
-      setSummary(data);
+      const data = await response.json();
+      if (!response.ok) {
+        setErrorMsg(data.error ?? `Request failed (HTTP ${response.status})`);
+        return;
+      }
+      setSummary(data as SummaryData);
     } catch {
-      setError(true);
+      setErrorMsg("Could not reach the server. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -71,21 +74,22 @@ const DebateSummaryModal = ({ threadId, isOpen, onClose }: DebateSummaryModalPro
           </p>
         )}
 
-        {error && (
+        {errorMsg && (
           <div className="flex flex-col gap-4">
-            <p className="text-red-500">
-              Failed to generate summary.
-            </p>
+            <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-xl p-4">
+              <p className="text-yellow-400 font-semibold text-sm mb-1">⚠ Summary Unavailable</p>
+              <p className="text-gray-400 text-sm leading-relaxed">{errorMsg}</p>
+            </div>
             <button
               onClick={fetchSummary}
               className="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium w-fit"
             >
-              Retry
+              Try Again
             </button>
           </div>
         )}
 
-        {!loading && !error && summary && (
+        {!loading && !errorMsg && summary && (
           <div className="flex flex-col gap-6 text-sm text-gray-300">
             <section>
               <h4 className="text-blue-400 font-semibold mb-2">Main Positions</h4>
