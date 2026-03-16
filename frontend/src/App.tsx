@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import ThreadView from "./components/ThreadView";
 import DebateSummaryModal from "./components/DebateSummaryModal";
 import ThreadSelector from "./components/ThreadSelector";
+import WelcomeModal from "./components/WelcomeModal";
 import { getThreads } from "./services/threadService";
 import type { Thread } from "./types/Thread";
 
@@ -11,6 +12,7 @@ function App() {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState("");
+  const [showWelcome, setShowWelcome] = useState(false);
 
   const modes: ("success" | "loading" | "empty" | "error")[] = [
     "success", "loading", "empty", "error",
@@ -20,7 +22,10 @@ function App() {
     getThreads()
       .then((data) => {
         setThreads(data);
-        if (data.length > 0) setSelectedThreadId(data[0].id);
+        if (data.length > 0) {
+          setSelectedThreadId(data[0].id);
+          setShowWelcome(true);
+        }
       })
       .catch(() => {/* backend not yet ready */});
   }, []);
@@ -114,6 +119,14 @@ function App() {
         isOpen={isSummaryOpen}
         onClose={() => setIsSummaryOpen(false)}
       />
+
+      {showWelcome && (
+        <WelcomeModal
+          threads={threads}
+          onSelect={setSelectedThreadId}
+          onClose={() => setShowWelcome(false)}
+        />
+      )}
     </div>
   );
 }
