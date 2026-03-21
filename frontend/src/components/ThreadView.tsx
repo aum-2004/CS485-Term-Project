@@ -9,10 +9,9 @@ import type { Comment } from "../types/Comment";
 interface ThreadViewProps {
   threadId: string;
   sortByScore: boolean;
-  mode: "success" | "loading" | "empty" | "error";
 }
 
-const ThreadView = ({ threadId, sortByScore, mode }: ThreadViewProps) => {
+const ThreadView = ({ threadId, sortByScore }: ThreadViewProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,35 +30,19 @@ const ThreadView = ({ threadId, sortByScore, mode }: ThreadViewProps) => {
       }
     };
 
-    if (mode === "success" && threadId) {
+    if (threadId) {
       fetchComments();
     } else {
       setLoading(false);
       setComments([]);
       setError(null);
     }
-  }, [mode, threadId]);
+  }, [threadId]);
 
-  if (mode === "loading") {
-    return (
-      <p className="text-center py-10 text-gray-400 animate-pulse">
-        Loading comments...
-      </p>
-    );
-  }
-
-  if (mode === "error") {
+  if (error) {
     return (
       <p className="text-center py-10 text-red-500">
         Failed to load comments.
-      </p>
-    );
-  }
-
-  if (mode === "empty") {
-    return (
-      <p className="text-center py-10 text-gray-400">
-        No comments available.
       </p>
     );
   }

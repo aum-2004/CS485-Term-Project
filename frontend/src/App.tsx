@@ -8,15 +8,10 @@ import type { Thread } from "./types/Thread";
 
 function App() {
   const [sortByScore, setSortByScore] = useState(false);
-  const [mode, setMode] = useState<"success" | "loading" | "empty" | "error">("success");
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState("");
   const [showWelcome, setShowWelcome] = useState(false);
-
-  const modes: ("success" | "loading" | "empty" | "error")[] = [
-    "success", "loading", "empty", "error",
-  ];
 
   useEffect(() => {
     getThreads()
@@ -54,21 +49,6 @@ function App() {
         <h1 className="text-lg sm:text-xl font-semibold tracking-wide">
           Reddit AI Debate Analyzer
         </h1>
-        <div className="flex gap-6 text-sm">
-          {modes.map((state) => (
-            <button
-              key={state}
-              onClick={() => setMode(state)}
-              className={`transition ${
-                mode === state
-                  ? "text-white border-b-2 border-blue-500 pb-1"
-                  : "text-gray-500 hover:text-white"
-              }`}
-            >
-              {state.charAt(0).toUpperCase() + state.slice(1)}
-            </button>
-          ))}
-        </div>
       </nav>
 
       {/* Hero */}
@@ -110,7 +90,6 @@ function App() {
         <ThreadView
           threadId={selectedThreadId}
           sortByScore={sortByScore}
-          mode={mode}
         />
       </div>
 
