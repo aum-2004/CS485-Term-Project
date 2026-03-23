@@ -53,7 +53,8 @@ export class ThreadService {
     for (const sub of SUBREDDITS) {
       let added = 0;
       try {
-        const urls = await this._reddit.fetchSubredditHot(sub, CANDIDATES);
+        // Use /new feed so threads change on every refresh, not just every few hours
+        const urls = await this._reddit.fetchSubredditNew(sub, CANDIDATES);
         for (const url of urls) {
           if (added >= POSTS_PER_SUB) break;
           try {

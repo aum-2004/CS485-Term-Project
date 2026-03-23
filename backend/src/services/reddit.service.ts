@@ -74,7 +74,21 @@ export class RedditService {
    * Externally visible.
    */
   async fetchSubredditHot(subreddit: string, limit = 3): Promise<string[]> {
-    const apiUrl = `https://www.reddit.com/r/${subreddit}/hot.json?limit=${limit}&raw_json=1`;
+    return this._fetchSubredditFeed(subreddit, "hot", limit);
+  }
+
+  /**
+   * Fetch the N most recently submitted post URLs from a subreddit.
+   * Updates every minute — use this for fresh content on each page load.
+   * Externally visible.
+   */
+  async fetchSubredditNew(subreddit: string, limit = 10): Promise<string[]> {
+    return this._fetchSubredditFeed(subreddit, "new", limit);
+  }
+
+  /** Shared fetcher for any subreddit feed (hot / new / rising). */
+  private async _fetchSubredditFeed(subreddit: string, feed: string, limit: number): Promise<string[]> {
+    const apiUrl = `https://www.reddit.com/r/${subreddit}/${feed}.json?limit=${limit}&raw_json=1`;
     try {
       const res = await fetch(apiUrl, {
         headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
@@ -86,7 +100,7 @@ export class RedditService {
         .map((c) => `https://www.reddit.com/r/${subreddit}/comments/${c.data.id}`)
         .slice(0, limit);
     } catch (err) {
-      throw new Error(`Failed to fetch r/${subreddit} hot: ${(err as Error).message}`);
+      throw new Error(`Failed to fetch r/${subreddit} ${feed}: ${(err as Error).message}`);
     }
   }
 
