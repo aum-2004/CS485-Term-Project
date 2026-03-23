@@ -39,23 +39,29 @@ export class ThreadService {
    * Externally visible.
    */
   async seedDefaultThreads(): Promise<void> {
-    const SUBREDDITS = ["technology", "worldnews", "science"];
-    const CANDIDATES = 5; // fetch a few extras in case some are comment-less
+    const SUBREDDITS = [
+      "technology", "worldnews", "science",
+      "todayilearned", "news", "space",
+    ];
+    const POSTS_PER_SUB = 3;  // up to 3 threads per subreddit = up to 18 total
+    const CANDIDATES    = 8;  // fetch extras to skip comment-less posts
 
     // Remove stale seeded threads so fresh ones take their place
     await this._repo.deleteAllSeeded();
     console.log("[seed] Cleared old seeded threads");
 
     for (const sub of SUBREDDITS) {
+      let added = 0;
       try {
         const urls = await this._reddit.fetchSubredditHot(sub, CANDIDATES);
         for (const url of urls) {
+          if (added >= POSTS_PER_SUB) break;
           try {
             await this._addRedditThreadAsSeeded(url);
             console.log(`[seed] Added fresh thread from r/${sub}`);
-            break; // only need 1 successful thread per subreddit
+            added++;
           } catch {
-            // comment-less or deleted post – try the next candidate
+            // comment-less or deleted post – try next candidate
           }
         }
       } catch (err) {
