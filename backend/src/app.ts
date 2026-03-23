@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { getComments } from "./modules/comments/comment.controller";
 import { getSummary, regenerateSummary } from "./modules/summary/summary.controller";
-import { getThreads, createThread, createCustomThread, deleteThread } from "./modules/threads/thread.controller";
+import { getThreads, createThread, createCustomThread, deleteThread, refreshSeededThreads } from "./modules/threads/thread.controller";
 import { errorHandler } from "./middleware/error.middleware";
 
 dotenv.config();
@@ -25,6 +25,7 @@ app.get("/health", (_req, res) => {
 
 // ── Thread management ─────────────────────────────────────────────────────────
 app.get("/api/threads", getThreads);
+app.post("/api/threads/seed/refresh", refreshSeededThreads); // called on every page load
 app.post("/api/threads", createThread);
 app.post("/api/threads/custom", createCustomThread);
 app.delete("/api/threads/:threadId", deleteThread);

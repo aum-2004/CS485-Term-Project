@@ -105,3 +105,23 @@ export async function deleteThread(
     next(err);
   }
 }
+
+/**
+ * POST /api/threads/seed/refresh
+ * Wipes stale auto-seeded threads, fetches today's hot posts from Reddit,
+ * and returns the full updated thread list.
+ * Called by the frontend on every page load so users always see fresh content.
+ */
+export async function refreshSeededThreads(
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    await service.seedDefaultThreads();
+    const threads = await service.getAllThreads();
+    res.json(threads);
+  } catch (err) {
+    next(err);
+  }
+}

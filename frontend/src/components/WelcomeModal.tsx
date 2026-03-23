@@ -2,11 +2,12 @@ import type { Thread } from "../types/Thread";
 
 interface WelcomeModalProps {
   threads: Thread[];
+  isLoading?: boolean;
   onSelect: (threadId: string) => void;
   onClose: () => void;
 }
 
-const WelcomeModal = ({ threads, onSelect, onClose }: WelcomeModalProps) => {
+const WelcomeModal = ({ threads, isLoading = false, onSelect, onClose }: WelcomeModalProps) => {
   const handleSelect = (threadId: string) => {
     onSelect(threadId);
     onClose();
@@ -26,7 +27,9 @@ const WelcomeModal = ({ threads, onSelect, onClose }: WelcomeModalProps) => {
           <div>
             <h2 className="text-xl font-bold text-white">Welcome back</h2>
             <p className="text-sm text-gray-400 mt-1">
-              Pick a thread to analyze, or close to start fresh.
+              {isLoading
+                ? "Fetching today's hot threads from Reddit…"
+                : "Pick a thread to analyze, or close to start fresh."}
             </p>
           </div>
           <button
@@ -40,7 +43,12 @@ const WelcomeModal = ({ threads, onSelect, onClose }: WelcomeModalProps) => {
 
         {/* Thread list */}
         <div className="overflow-y-auto px-6 py-4 flex flex-col gap-3">
-          {threads.length === 0 ? (
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-400 text-sm">Loading fresh threads…</p>
+            </div>
+          ) : threads.length === 0 ? (
             <p className="text-gray-500 text-sm text-center py-8">
               No threads yet — add one using the URL bar below.
             </p>

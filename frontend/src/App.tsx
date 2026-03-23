@@ -3,7 +3,7 @@ import ThreadView from "./components/ThreadView";
 import DebateSummaryModal from "./components/DebateSummaryModal";
 import ThreadSelector from "./components/ThreadSelector";
 import WelcomeModal from "./components/WelcomeModal";
-import { getThreads } from "./services/threadService";
+import { refreshAndGetThreads } from "./services/threadService";
 import type { Thread } from "./types/Thread";
 
 function App() {
@@ -12,17 +12,18 @@ function App() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState("");
   const [showWelcome, setShowWelcome] = useState(false);
+  const [threadsLoading, setThreadsLoading] = useState(false);
 
   useEffect(() => {
-    getThreads()
+    setShowWelcome(true);   // open modal immediately so spinner is visible
+    setThreadsLoading(true);
+    refreshAndGetThreads()
       .then((data) => {
         setThreads(data);
-        if (data.length > 0) {
-          setSelectedThreadId(data[0].id);
-          setShowWelcome(true);
-        }
+        if (data.length > 0) setSelectedThreadId(data[0].id);
       })
-      .catch(() => {/* backend not yet ready */});
+      .catch(() => {/* backend not yet ready */})
+      .finally(() => setThreadsLoading(false));
   }, []);
 
   const handleThreadAdded = (thread: Thread) => {
@@ -102,6 +103,7 @@ function App() {
       {showWelcome && (
         <WelcomeModal
           threads={threads}
+          isLoading={threadsLoading}
           onSelect={setSelectedThreadId}
           onClose={() => setShowWelcome(false)}
         />

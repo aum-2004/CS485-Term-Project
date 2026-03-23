@@ -8,6 +8,15 @@ export const getThreads = async (): Promise<Thread[]> => {
   return response.json();
 };
 
+/** Wipe stale seeded threads, pull today's hot Reddit posts, return the fresh list. */
+export const refreshAndGetThreads = async (): Promise<Thread[]> => {
+  const response = await fetch(`${API_BASE}/api/threads/seed/refresh`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error(`Failed to refresh threads: ${response.status}`);
+  return response.json();
+};
+
 export const addThread = async (redditUrl: string): Promise<Thread> => {
   const response = await fetch(`${API_BASE}/api/threads`, {
     method: "POST",
