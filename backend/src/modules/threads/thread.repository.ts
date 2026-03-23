@@ -23,6 +23,7 @@ function rowToThread(row: ThreadRow): Thread {
   };
 }
 
+
 export class ThreadRepository {
   /** Return all threads ordered newest-first, with comment counts. */
   async findAll(): Promise<Thread[]> {
@@ -48,15 +49,25 @@ export class ThreadRepository {
 
   /**
    * Create a thread. Idempotent – does nothing if the thread already exists.
+   * Pass isSeeded=true for auto-seeded Reddit threads so they can be refreshed later.
    * Externally visible.
    */
-  async create(id: string, title: string): Promise<void> {
+  async create(id: string, title: string, isSeeded = false): Promise<void> {
     await pool.query(
-      `INSERT INTO threads (id, title)
-       VALUES ($1, $2)
+      `INSERT INTO threads (id, title, is_seeded)
+       VALUES ($1, $2, $3)
        ON CONFLICT (id) DO NOTHING`,
-      [id, title]
+      [id, title, isSeeded]
     );
+  }
+
+  /**
+   * Delete all auto-seeded threads (and their comments/summaries via CASCADE).
+   * Called before re-seeding so users always see fresh Reddit posts.
+   * Externally visible.
+   */
+  async deleteAllSeeded(): Promise<void> {
+    await pool.query(`DELETE FROM threads WHERE is_seeded = TRUE`);
   }
 
   /** Delete a thread and all its comments/summaries (CASCADE). */

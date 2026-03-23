@@ -8,8 +8,12 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS threads (
   id          TEXT        PRIMARY KEY,
   title       TEXT        NOT NULL,
+  is_seeded   BOOLEAN     NOT NULL DEFAULT FALSE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migration: add is_seeded to existing DBs that predate this column
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS is_seeded BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Individual comments belonging to a thread.
 -- reasoning_score and ai_summary are populated by the AI Analysis Module.

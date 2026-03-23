@@ -33,29 +33,47 @@ export class ThreadService {
   }
 
   /**
-   * Fetch hot posts from a curated set of subreddits and persist them
-   * so users see real threads the moment they open the app.
-   * Skips any thread already in the DB (idempotent).
+   * Wipe all previously seeded threads, then fetch today's hot posts from
+   * a curated set of subreddits so users always see fresh content.
+   * User-added threads (is_seeded=false) are never touched.
    * Externally visible.
    */
   async seedDefaultThreads(): Promise<void> {
     const SUBREDDITS = ["technology", "worldnews", "science"];
-    const POSTS_PER_SUB = 1; // 1 hot post per subreddit = 3 default threads
+    const CANDIDATES = 5; // fetch a few extras in case some are comment-less
+
+    // Remove stale seeded threads so fresh ones take their place
+    await this._repo.deleteAllSeeded();
+    console.log("[seed] Cleared old seeded threads");
 
     for (const sub of SUBREDDITS) {
       try {
-        const urls = await this._reddit.fetchSubredditHot(sub, POSTS_PER_SUB + 2);
+        const urls = await this._reddit.fetchSubredditHot(sub, CANDIDATES);
         for (const url of urls) {
           try {
-            await this.addRedditThread(url); // idempotent
-            break; // only need 1 successful thread per sub
+            await this._addRedditThreadAsSeeded(url);
+            console.log(`[seed] Added fresh thread from r/${sub}`);
+            break; // only need 1 successful thread per subreddit
           } catch {
-            // comment-less or deleted post – try the next one
+            // comment-less or deleted post – try the next candidate
           }
         }
       } catch (err) {
         console.warn(`[seed] Could not fetch r/${sub}:`, (err as Error).message);
       }
+    }
+  }
+
+  /**
+   * Internal helper: fetch a Reddit thread and persist it marked as seeded.
+   */
+  private async _addRedditThreadAsSeeded(redditUrl: string): Promise<void> {
+    const fetched = await this._reddit.fetchThread(redditUrl);
+    const { threadId, title, comments } = fetched;
+
+    await this._repo.create(threadId, title, true); // isSeeded = true
+    for (const c of comments) {
+      await this._repo.insertComment(threadId, c.id, c.author, c.content);
     }
   }
 
