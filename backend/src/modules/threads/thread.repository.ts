@@ -56,7 +56,7 @@ export class ThreadRepository {
     await pool.query(
       `INSERT INTO threads (id, title, is_seeded)
        VALUES ($1, $2, $3)
-       ON CONFLICT (id) DO NOTHING`,
+       ON CONFLICT (id) DO UPDATE SET is_seeded = EXCLUDED.is_seeded`,
       [id, title, isSeeded]
     );
   }

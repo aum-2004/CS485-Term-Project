@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS threads (
 -- Migration: add is_seeded to existing DBs that predate this column
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS is_seeded BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Mark all existing reddit_ threads as seeded so they get refreshed on next startup.
+-- Custom threads (id starts with 'custom_') are left as is_seeded=FALSE and are never touched.
+UPDATE threads SET is_seeded = TRUE WHERE id LIKE 'reddit_%';
+
 -- Individual comments belonging to a thread.
 -- reasoning_score and ai_summary are populated by the AI Analysis Module.
 CREATE TABLE IF NOT EXISTS comments (
