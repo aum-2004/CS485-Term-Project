@@ -43,8 +43,8 @@ export class ThreadService {
       "technology", "worldnews", "science",
       "todayilearned", "news", "space",
     ];
-    const POSTS_PER_SUB = 3;   // pick 3 per subreddit = up to 18 total
-    const CANDIDATES    = 25;  // large pool to shuffle so each refresh differs
+    const POSTS_PER_SUB = 3;  // top 3 per subreddit = up to 18 total
+    const CANDIDATES    = 8;  // fetch a few extras to skip comment-less posts
 
     // Remove stale seeded threads so fresh ones take their place
     await this._repo.deleteAllSeeded();
@@ -53,11 +53,8 @@ export class ThreadService {
     for (const sub of SUBREDDITS) {
       let added = 0;
       try {
-        // Fetch a large pool from /hot (guaranteed comments) then shuffle so
-        // each refresh picks a different random subset of active threads
         const urls = await this._reddit.fetchSubredditHot(sub, CANDIDATES);
-        const shuffled = urls.sort(() => Math.random() - 0.5);
-        for (const url of shuffled) {
+        for (const url of urls) {
           if (added >= POSTS_PER_SUB) break;
           try {
             await this._addRedditThreadAsSeeded(url);
