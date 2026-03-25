@@ -1,0 +1,29 @@
+{
+  "name": "cs485-term-project",
+  "version": "1.0.0",
+  "description": "This is the group project for the NJIT's CS485 made by Aryan Modi",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "concurrently --names \"backend,frontend\" --prefix-colors \"blue,green\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "test": "npm test --prefix backend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aum-2004/CS485-Term-Project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/aum-2004/CS485-Term-Project/issues"
+  },
+  "homepage": "https://github.com/aum-2004/CS485-Term-Project#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

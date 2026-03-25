@@ -6,12 +6,16 @@ interface CommentCardProps {
 }
 
 const CommentCard = ({ comment, isTopReasoning }: CommentCardProps) => {
-  const scoreStyles =
-    comment.reasoningScore >= 8
-      ? "bg-green-600/20 text-green-400"
-      : comment.reasoningScore >= 6
-      ? "bg-yellow-600/20 text-yellow-400"
-      : "bg-red-600/20 text-red-400";
+  // A comment is pending if it has never been analysed yet
+  const isPending = !comment.analyzedAt;
+
+  const scoreStyles = isPending
+    ? "bg-gray-700/40 text-gray-500"
+    : comment.reasoningScore >= 80
+    ? "bg-green-600/20 text-green-400"
+    : comment.reasoningScore >= 55
+    ? "bg-yellow-600/20 text-yellow-400"
+    : "bg-red-600/20 text-red-400";
 
   return (
     <div
@@ -19,7 +23,7 @@ const CommentCard = ({ comment, isTopReasoning }: CommentCardProps) => {
         relative
         bg-[#0f172a]
         border
-        ${isTopReasoning ? "border-purple-500/40 shadow-purple-500/20 shadow-2xl" : "border-gray-800"}
+        ${isTopReasoning && !isPending ? "border-purple-500/40 shadow-purple-500/20 shadow-2xl" : "border-gray-800"}
         rounded-2xl
         p-6 sm:p-8
         transition-all duration-300 ease-out
@@ -41,7 +45,7 @@ const CommentCard = ({ comment, isTopReasoning }: CommentCardProps) => {
               u/{comment.author}
             </p>
 
-            {isTopReasoning && (
+            {isTopReasoning && !isPending && (
               <span className="mt-2 bg-purple-600/20 text-purple-400 text-xs px-3 py-1 rounded-full w-fit backdrop-blur-sm">
                 Top Reasoning
               </span>
@@ -57,7 +61,7 @@ const CommentCard = ({ comment, isTopReasoning }: CommentCardProps) => {
           <div
             className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all duration-300 ${scoreStyles}`}
           >
-            {comment.reasoningScore}
+            {isPending ? "—" : comment.reasoningScore}
           </div>
         </div>
       </div>
@@ -68,13 +72,19 @@ const CommentCard = ({ comment, isTopReasoning }: CommentCardProps) => {
       </p>
 
       {/* AI Summary */}
-      <div className="bg-[#111827] border border-blue-500/20 rounded-xl p-5 transition duration-300 hover:border-blue-400/40">
-        <span className="text-blue-400 font-semibold tracking-wide">
+      <div className={`bg-[#111827] border rounded-xl p-5 transition duration-300 ${isPending ? "border-gray-700/40" : "border-blue-500/20 hover:border-blue-400/40"}`}>
+        <span className={`font-semibold tracking-wide ${isPending ? "text-gray-600" : "text-blue-400"}`}>
           AI Summary
         </span>
-        <p className="text-gray-400 mt-3 leading-relaxed text-sm sm:text-base">
-          {comment.summary}
-        </p>
+        {isPending ? (
+          <p className="text-gray-600 mt-3 text-sm italic animate-pulse">
+            AI analysis pending — will appear on next page load…
+          </p>
+        ) : (
+          <p className="text-gray-400 mt-3 leading-relaxed text-sm sm:text-base">
+            {comment.summary}
+          </p>
+        )}
       </div>
     </div>
   );
