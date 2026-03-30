@@ -19,7 +19,6 @@ jest.mock("@google/generative-ai", () => ({
   GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
     getGenerativeModel: jest.fn().mockReturnValue({
       generateContent: jest.fn().mockImplementation((prompt: string) => {
-        // Return a higher score for longer prompts (simulates keyword-rich detection)
         const score = prompt.length > 500 ? 80 : 30;
         return Promise.resolve({
           response: {
@@ -32,7 +31,7 @@ jest.mock("@google/generative-ai", () => ({
   })),
 }));
 
-// ── Minimal mock of CommentRepository ──────────────────────────────────────
+// ── Comment fixtures ────────────────────────────────────────────────────────
 const unanalysedComment: Comment = {
   id: "c1",
   threadId: "t1",
@@ -41,28 +40,26 @@ const unanalysedComment: Comment = {
     "The longitudinal design provides temporal precedence and multivariate regression controls for confounders.",
   reasoningScore: 0,
   summary: "",
-  analyzedAt: "",
+  analyzedAt: "",        // falsy → triggers background analysis
   createdAt: new Date().toISOString(),
 };
 
-// Simulates the DB row after saveAnalysis has been called.
 const analysedComment: Comment = {
   ...unanalysedComment,
   reasoningScore: 90,
   summary: "Highlights longitudinal design and temporal precedence.",
-  analyzedAt: new Date().toISOString(),
+  analyzedAt: new Date().toISOString(), // truthy → already done
 };
 
+// ── Mock repository ─────────────────────────────────────────────────────────
 const mockRepo = {
-  // findByThreadId returns analysed comments (reflecting DB state after saveAnalysis).
   findByThreadId: jest.fn().mockResolvedValue([analysedComment]),
-  // findUnanalysed returns the original unscored comment.
   findUnanalysed: jest.fn().mockResolvedValue([unanalysedComment]),
   saveAnalysis: jest.fn().mockResolvedValue(undefined),
   threadExists: jest.fn().mockResolvedValue(true),
 };
 
-// ── Minimal mock of Redis (always cache-miss so logic runs fully) ───────────
+// ── Mock Redis (always cache-miss unless overridden) ─────────────────────────
 jest.mock("../src/config/redis", () => ({
   redis: {
     get: jest.fn().mockResolvedValue(null),
@@ -81,19 +78,20 @@ describe("CommentService – User Story A", () => {
     service = new CommentService(mockRepo as never, new AIService());
   });
 
+  // ── Basic response shape ──────────────────────────────────────────────────
+
   it("returns enriched comments with reasoning score > 0", async () => {
     const comments = await service.getEnrichedComments("t1");
-
     expect(comments).toHaveLength(1);
     expect(comments[0].reasoningScore).toBeGreaterThan(0);
   });
 
+  // ── Background analysis triggered only for unanalysed comments ───────────
+
   it("calls saveAnalysis for unanalysed comments", async () => {
-    // Return a comment without analyzedAt so the service triggers background analysis
     mockRepo.findByThreadId.mockResolvedValueOnce([unanalysedComment]);
 
     await service.getEnrichedComments("t1");
-    // Flush the microtask queue so the background _analyseNewComments promise settles
     await new Promise((r) => setImmediate(r));
 
     expect(mockRepo.saveAnalysis).toHaveBeenCalledWith(
@@ -103,20 +101,79 @@ describe("CommentService – User Story A", () => {
     );
   });
 
-  it("populates the Redis cache after fetching from DB", async () => {
+  it("does NOT call saveAnalysis when all comments are already analysed", async () => {
+    mockRepo.findByThreadId.mockResolvedValueOnce([analysedComment]);
+
+    await service.getEnrichedComments("t1");
+    await new Promise((r) => setImmediate(r));
+
+    expect(mockRepo.saveAnalysis).not.toHaveBeenCalled();
+  });
+
+  it("calls findUnanalysed during background analysis", async () => {
+    mockRepo.findByThreadId.mockResolvedValueOnce([unanalysedComment]);
+
+    await service.getEnrichedComments("t1");
+    await new Promise((r) => setImmediate(r));
+
+    expect(mockRepo.findUnanalysed).toHaveBeenCalledWith("t1");
+  });
+
+  // ── Cache population ──────────────────────────────────────────────────────
+
+  it("sets cache with exact TTL of 300 seconds when all comments are analysed", async () => {
     const { redis } = await import("../src/config/redis");
+    mockRepo.findByThreadId.mockResolvedValueOnce([analysedComment]);
+
     await service.getEnrichedComments("t1");
 
     expect(redis.setex).toHaveBeenCalledWith(
       "thread:t1:comments",
-      300,
+      300,               // must be exactly 300 – kills off-by-one mutations
       expect.any(String)
     );
   });
 
-  it("returns from cache on second call (no DB hit)", async () => {
+  it("does NOT cache when there are unanalysed comments (avoids caching partial data)", async () => {
     const { redis } = await import("../src/config/redis");
-    const cachedData = JSON.stringify([{ ...unanalysedComment, reasoningScore: 90 }]);
+    mockRepo.findByThreadId.mockResolvedValueOnce([unanalysedComment]);
+
+    await service.getEnrichedComments("t1");
+
+    expect(redis.setex).not.toHaveBeenCalled();
+  });
+
+  it("uses correct cache key format thread:{threadId}:comments", async () => {
+    const { redis } = await import("../src/config/redis");
+    mockRepo.findByThreadId.mockResolvedValueOnce([analysedComment]);
+
+    await service.getEnrichedComments("t1");
+
+    expect(redis.setex).toHaveBeenCalledWith(
+      "thread:t1:comments",
+      expect.any(Number),
+      expect.any(String)
+    );
+  });
+
+  it("cache key varies with threadId", async () => {
+    const { redis } = await import("../src/config/redis");
+    mockRepo.findByThreadId.mockResolvedValue([analysedComment]);
+
+    await service.getEnrichedComments("other-thread");
+
+    expect(redis.setex).toHaveBeenCalledWith(
+      "thread:other-thread:comments",
+      expect.any(Number),
+      expect.any(String)
+    );
+  });
+
+  // ── Cache hit path ────────────────────────────────────────────────────────
+
+  it("returns from cache when Redis has data (no DB hit)", async () => {
+    const { redis } = await import("../src/config/redis");
+    const cachedData = JSON.stringify([{ ...analysedComment, reasoningScore: 90 }]);
     (redis.get as jest.Mock).mockResolvedValueOnce(cachedData);
 
     const comments = await service.getEnrichedComments("t1");
@@ -124,7 +181,36 @@ describe("CommentService – User Story A", () => {
     expect(comments[0].reasoningScore).toBe(90);
     expect(mockRepo.findByThreadId).not.toHaveBeenCalled();
   });
+
+  it("reads cache using key thread:{threadId}:comments", async () => {
+    const { redis } = await import("../src/config/redis");
+
+    await service.getEnrichedComments("t1");
+
+    expect(redis.get).toHaveBeenCalledWith("thread:t1:comments");
+  });
+
+  // ── invalidateCache ───────────────────────────────────────────────────────
+
+  it("invalidateCache calls redis.del with exact key", async () => {
+    const { redis } = await import("../src/config/redis");
+
+    await service.invalidateCache("t1");
+
+    expect(redis.del).toHaveBeenCalledWith("thread:t1:comments");
+    expect(redis.del).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidateCache key includes the correct threadId", async () => {
+    const { redis } = await import("../src/config/redis");
+
+    await service.invalidateCache("thread-xyz");
+
+    expect(redis.del).toHaveBeenCalledWith("thread:thread-xyz:comments");
+  });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe("AIService – comment analysis", () => {
   const ai = new AIService();
@@ -151,5 +237,42 @@ describe("AIService – comment analysis", () => {
         "We must consider confounding variables and publication bias when interpreting the results."
     );
     expect(rich.reasoningScore).toBeGreaterThan(simple.reasoningScore);
+  });
+
+  it("clamps score to exactly 100 when AI returns a value above 100", async () => {
+    // Override generateContent on the existing mock instance to return out-of-range score
+    const { GoogleGenerativeAI } = require("@google/generative-ai");
+    const mockInstance = (GoogleGenerativeAI as jest.Mock).mock.results[0]?.value;
+    const mockModel = mockInstance?.getGenerativeModel?.mock?.results[0]?.value;
+    if (mockModel?.generateContent) {
+      (mockModel.generateContent as jest.Mock).mockResolvedValueOnce({
+        response: { text: () => '[{"index":0,"reasoningScore":150,"summary":"Great."}]' },
+      });
+    }
+    const result = await ai.analyseComment("test");
+    expect(result.reasoningScore).toBeLessThanOrEqual(100);
+  });
+
+  it("clamps score to at least 0 when AI returns a negative value", async () => {
+    const { GoogleGenerativeAI } = require("@google/generative-ai");
+    const mockInstance = (GoogleGenerativeAI as jest.Mock).mock.results[0]?.value;
+    const mockModel = mockInstance?.getGenerativeModel?.mock?.results[0]?.value;
+    if (mockModel?.generateContent) {
+      (mockModel.generateContent as jest.Mock).mockResolvedValueOnce({
+        response: { text: () => '[{"index":0,"reasoningScore":-20,"summary":"Poor."}]' },
+      });
+    }
+    const result = await ai.analyseComment("test");
+    expect(result.reasoningScore).toBeGreaterThanOrEqual(0);
+  });
+
+  it("returns empty array for empty input without calling Gemini", async () => {
+    const result = await ai.analyseComments([]);
+    expect(result).toEqual([]);
+  });
+
+  it("returns one result per input comment preserving order", async () => {
+    const results = await ai.analyseComments(["first comment", "second comment"]);
+    expect(results).toHaveLength(2);
   });
 });
