@@ -124,8 +124,20 @@ The default thread ID used by the frontend is **`thread-default`**.
 
 ## Running tests
 
+### Prerequisites
+- Node.js ≥ 18
+- No database or Redis required — all external calls are mocked with Jest
+
+### Run all tests
 ```bash
-npm test
+cd backend
+npm install        # first time only
+npm test           # runs all 35 tests
 ```
 
-Tests do **not** require Docker – all database and Redis calls are mocked with Jest.
+### Run tests with coverage report
+```bash
+npm run test:coverage
+```
+
+Tests are in `backend/tests/`. All database and Redis calls are mocked with Jest so no infrastructure is needed.
