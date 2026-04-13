@@ -9,18 +9,8 @@
  */
 
 import serverlessExpress from "@vendia/serverless-express";
-import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from "aws-lambda";
 import app from "./app";
 
 // One-time bootstrap: create the adapter at cold-start, reuse across warm invocations.
-const handler = serverlessExpress({ app });
-
-export const lambdaHandler = async (
-  event: APIGatewayProxyEvent,
-  context: Context
-): Promise<APIGatewayProxyResult> => {
-  // Allow the Lambda execution to finish even if there are open handles
-  // (e.g. pg connection pool) by not waiting for the event loop to drain.
-  context.callbackWaitsForEmptyEventLoop = false;
-  return handler(event, context) as Promise<APIGatewayProxyResult>;
-};
+// Exported directly as lambdaHandler for use in Lambda runtime.
+export const lambdaHandler = serverlessExpress({ app });
