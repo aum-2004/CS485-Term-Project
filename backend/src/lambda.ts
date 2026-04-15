@@ -11,6 +11,6 @@
 import serverlessExpress from "@vendia/serverless-express";
 import app from "./app";
 
-// One-time bootstrap: create the adapter at cold-start, reuse across warm invocations.
-// Exported directly as lambdaHandler for use in Lambda runtime.
-export const lambdaHandler = serverlessExpress({ app });
+// Use PROMISE resolution mode so the handler returns a Promise directly,
+// which is compatible with all Node.js Lambda runtimes.
+export const lambdaHandler = serverlessExpress({ app, resolutionMode: "PROMISE" });
