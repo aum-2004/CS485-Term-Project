@@ -103,10 +103,8 @@ Tests are in `backend/tests/integration/` and use [Jest](https://jestjs.io/) + [
 
 | Resource | URL |
 |---|---|
-| Frontend (Amplify) | `https://<branch>.amplifyapp.com` |
-| Backend REST API (API Gateway → Lambda) | `https://<api-id>.execute-api.us-east-1.amazonaws.com/prod` |
-
-> Replace the placeholder URLs above with the real endpoints once deployed.
+| Frontend (Amplify) | `https://main.d5nlkn0tc4gbz.amplifyapp.com` |
+| Backend REST API (API Gateway → Lambda) | `https://rf1kl76hmi.execute-api.us-east-1.amazonaws.com/prod` |
 
 ### Using the Deployed App
 1. Open the Amplify frontend URL in any browser.
@@ -123,31 +121,35 @@ Follow these steps if you fork this repo and want to deploy it yourself.
 ### 1. Create AWS account
 Sign up at [aws.amazon.com](https://aws.amazon.com). Free-tier is sufficient for this project.
 
-### 2. Create an RDS PostgreSQL database (free tier)
-```
-Engine: PostgreSQL 16
-Instance class: db.t3.micro (free tier)
-DB name: debate_analyzer
-Username: debate_user
-Password: <your-password>
-```
-Note the endpoint — you'll use it as `DATABASE_URL`.
-
-### 3. Package and deploy the Lambda function
+### 2. Create a free cloud PostgreSQL database (Neon)
+1. Sign up at [neon.tech](https://neon.tech) (free tier).
+2. Create a new project in region **AWS US East 1 (N. Virginia)**.
+3. Copy the connection string — this is your `DATABASE_URL` (format: `postgresql://user:pass@host/db?sslmode=require`).
+4. Run the schema migration:
 ```bash
 cd backend
-cp .env.example .env
-# Set DATABASE_URL, GEMINI_API_KEY, CORS_ORIGIN in .env
-npm ci
-npm run build:lambda     # compiles TS + zips dist/ + node_modules
-aws lambda create-function \
-  --function-name debate-analyzer-backend \
-  --runtime nodejs20.x \
-  --handler lambda.lambdaHandler \
-  --zip-file fileb://lambda.zip \
-  --role arn:aws:iam::<account-id>:role/lambda-execution-role \
-  --environment "Variables={DATABASE_URL=...,GEMINI_API_KEY=...,CORS_ORIGIN=...}"
+DATABASE_URL=<your-neon-url> npm run db:migrate
 ```
+
+### 3. Package and deploy the Lambda function
+1. In AWS Console → Lambda → **Create function** (Node.js 22.x, x86_64).
+2. Build and upload the deployment package:
+```bash
+cd backend
+npm ci
+npm run build          # compiles TypeScript to dist/
+cd dist && zip -r ../lambda.zip . && cd ..
+npm ci --omit=dev      # production deps only
+zip -r lambda.zip node_modules
+```
+3. Upload `lambda.zip` via **Code → Upload from → .zip file**.
+4. Set **Runtime settings → Handler** to `lambda.lambdaHandler`.
+5. Set **Configuration → General configuration**: Timeout = 30s, Memory = 256 MB.
+6. Set **Configuration → Environment variables**:
+   - `NODE_ENV` = `production`
+   - `DATABASE_URL` = your Neon connection string
+   - `GEMINI_API_KEY` = your Gemini API key
+   - `CORS_ORIGIN` = your Amplify frontend URL
 
 ### 4. Create API Gateway (REST API)
 - Create a new REST API in the AWS Console.
