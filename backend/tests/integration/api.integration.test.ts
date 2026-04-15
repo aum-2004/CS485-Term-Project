@@ -61,6 +61,16 @@ beforeAll(async () => {
      ON CONFLICT (id) DO NOTHING`,
     [SEED_THREAD_ID]
   );
+  // Pre-seed a debate summary so cloud tests don't hit Gemini quota on first call
+  await pool.query(
+    `INSERT INTO debate_summaries (id, thread_id, main_positions, supporting_evidence, areas_of_disagreement)
+     VALUES ('integration-summary-1', $1,
+             ARRAY['AI enrichment is valuable for debate analysis'],
+             ARRAY['Comments can be scored for reasoning quality'],
+             ARRAY['Automated analysis may miss nuance'])
+     ON CONFLICT (thread_id) DO NOTHING`,
+    [SEED_THREAD_ID]
+  );
 });
 
 afterAll(async () => {
@@ -133,7 +143,7 @@ describe("GET /api/threads/:id/comments – enriched comments (ThreadView / User
   it("returns an array of comment objects", async () => {
     const res = await agent.get(`/api/threads/${SEED_THREAD_ID}/comments`);
     expect(Array.isArray(res.body)).toBe(true);
-  });
+  }, 30000);
 
   it("each comment has id, author, content, reasoningScore, and summary", async () => {
     const res = await agent.get(`/api/threads/${SEED_THREAD_ID}/comments`);
@@ -146,7 +156,7 @@ describe("GET /api/threads/:id/comments – enriched comments (ThreadView / User
       expect(c).toHaveProperty("reasoningScore");
       expect(c).toHaveProperty("summary");
     }
-  });
+  }, 30000);
 
   it("reasoningScore is a number between 0 and 100", async () => {
     const res = await agent.get(`/api/threads/${SEED_THREAD_ID}/comments`);
@@ -156,7 +166,7 @@ describe("GET /api/threads/:id/comments – enriched comments (ThreadView / User
       expect(c.reasoningScore).toBeGreaterThanOrEqual(0);
       expect(c.reasoningScore).toBeLessThanOrEqual(100);
     }
-  });
+  }, 30000);
 
   it("returns 404 for a non-existent thread", async () => {
     const res = await agent.get("/api/threads/does-not-exist-xyz/comments");
@@ -173,14 +183,14 @@ describe("GET /api/threads/:id/summary – debate summary (DebateSummaryModal / 
   it("returns 200 for the seeded thread", async () => {
     const res = await agent.get(`/api/threads/${SEED_THREAD_ID}/summary`);
     expect(res.status).toBe(200);
-  });
+  }, 30000);
 
   it("response has mainPositions, supportingEvidence, and areasOfDisagreement arrays", async () => {
     const res = await agent.get(`/api/threads/${SEED_THREAD_ID}/summary`);
     expect(Array.isArray(res.body.mainPositions)).toBe(true);
     expect(Array.isArray(res.body.supportingEvidence)).toBe(true);
     expect(Array.isArray(res.body.areasOfDisagreement)).toBe(true);
-  });
+  }, 30000);
 
   it("each array contains at least one non-empty string", async () => {
     const res = await agent.get(`/api/threads/${SEED_THREAD_ID}/summary`);
@@ -192,7 +202,7 @@ describe("GET /api/threads/:id/summary – debate summary (DebateSummaryModal / 
         expect(item.length).toBeGreaterThan(0);
       }
     }
-  });
+  }, 30000);
 
   it("returns 404 for a non-existent thread", async () => {
     const res = await agent.get("/api/threads/no-such-thread-xyz/summary");
