@@ -22,7 +22,7 @@ export interface RedditThread {
   comments: RedditComment[];
 }
 
-const USER_AGENT = "CS485DebateAnalyzer/1.0";
+const USER_AGENT = "Mozilla/5.0 (compatible; CS485DebateAnalyzer/1.0; +https://github.com/aum-2004/CS485-Term-Project)";
 const MAX_COMMENTS = 25;
 
 export class RedditService {
@@ -46,7 +46,8 @@ export class RedditService {
    */
   async fetchThread(redditUrl: string): Promise<RedditThread> {
     const postId = this.parsePostId(redditUrl);
-    const apiUrl = `https://www.reddit.com/comments/${postId}.json?limit=${MAX_COMMENTS}&raw_json=1`;
+    // Use old.reddit.com which is less restrictive on cloud IP ranges
+    const apiUrl = `https://old.reddit.com/comments/${postId}.json?limit=${MAX_COMMENTS}&raw_json=1`;
 
     let data: unknown;
     try {
@@ -54,6 +55,7 @@ export class RedditService {
         headers: {
           "User-Agent": USER_AGENT,
           Accept: "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
         },
       });
 
@@ -88,10 +90,10 @@ export class RedditService {
 
   /** Shared fetcher for any subreddit feed (hot / new / rising). */
   private async _fetchSubredditFeed(subreddit: string, feed: string, limit: number): Promise<string[]> {
-    const apiUrl = `https://www.reddit.com/r/${subreddit}/${feed}.json?limit=${limit}&raw_json=1`;
+    const apiUrl = `https://old.reddit.com/r/${subreddit}/${feed}.json?limit=${limit}&raw_json=1`;
     try {
       const res = await fetch(apiUrl, {
-        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json", "Accept-Language": "en-US,en;q=0.9" },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { data: { children: Array<{ data: { id: string; stickied: boolean } }> } };
