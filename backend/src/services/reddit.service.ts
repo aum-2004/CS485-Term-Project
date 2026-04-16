@@ -2,12 +2,16 @@
  * RedditService – fetches real thread data from Reddit's public JSON API.
  *
  * No authentication required for public posts.
- * API: https://www.reddit.com/r/{sub}/comments/{id}.json?limit=25&raw_json=1
+ * API: https://old.reddit.com/comments/{id}.json?limit=25&raw_json=1
  *
  * Supported URL formats:
  *   https://www.reddit.com/r/science/comments/abc123/title/
- *   reddit.com/r/science/comments/abc123/
  *   https://www.reddit.com/r/science/comments/abc123
+ *   https://reddit.com/r/science/comments/abc123/
+ *   https://old.reddit.com/r/science/comments/abc123/
+ *   https://new.reddit.com/r/science/comments/abc123/
+ *   https://www.reddit.com/r/science/s/AbCdEfGhIj  (new share links – resolved via redirect)
+ *   https://redd.it/abc123                         (short links – resolved via redirect)
  */
 
 export interface RedditComment {
@@ -27,14 +31,56 @@ const MAX_COMMENTS = 25;
 
 export class RedditService {
   /**
-   * Parse the Reddit post ID from any recognised URL format.
-   * Throws if the URL is not a valid Reddit thread URL.
+   * Resolve any Reddit URL to a canonical /r/<sub>/comments/<id>/ URL.
+   * Handles: standard, old/new subdomain, share links (/s/…), redd.it short links.
+   * Throws if the URL cannot be resolved to a thread.
+   */
+  private async _resolveUrl(url: string): Promise<string> {
+    // Already a standard comments URL?
+    if (/reddit\.com\/r\/[^/]+\/comments\/[a-z0-9]+/i.test(url)) {
+      return url;
+    }
+
+    // redd.it/<id> short link
+    const shortMatch = url.match(/redd\.it\/([a-z0-9]+)/i);
+    if (shortMatch) {
+      return `https://www.reddit.com/comments/${shortMatch[1]}`;
+    }
+
+    // New Reddit share link: /r/<sub>/s/<shareId>
+    const shareMatch = url.match(/reddit\.com\/r\/([^/]+)\/s\/([a-z0-9]+)/i);
+    if (shareMatch) {
+      // Follow the redirect to get the real URL
+      try {
+        const res = await fetch(url, {
+          method: "HEAD",
+          headers: { "User-Agent": USER_AGENT },
+          redirect: "follow",
+        });
+        const resolved = res.url;
+        if (/reddit\.com\/r\/[^/]+\/comments\/[a-z0-9]+/i.test(resolved)) {
+          return resolved;
+        }
+      } catch {
+        // fall through to error below
+      }
+    }
+
+    throw new Error(
+      "Invalid Reddit URL. Paste the link from your browser's address bar, e.g. https://www.reddit.com/r/technology/comments/abc123/"
+    );
+  }
+
+  /**
+   * Parse the Reddit post ID from a resolved comments URL.
+   * For direct use in tests; production code goes through _resolveUrl first.
    */
   parsePostId(url: string): string {
-    const match = url.match(/reddit\.com\/r\/[^/]+\/comments\/([a-z0-9]+)/i);
+    const match = url.match(/reddit\.com\/r\/[^/]+\/comments\/([a-z0-9]+)/i)
+      ?? url.match(/reddit\.com\/comments\/([a-z0-9]+)/i);
     if (!match) {
       throw new Error(
-        "Invalid Reddit URL. Expected format: https://www.reddit.com/r/<sub>/comments/<id>/..."
+        "Invalid Reddit URL. Paste the link from your browser's address bar, e.g. https://www.reddit.com/r/technology/comments/abc123/"
       );
     }
     return match[1];
@@ -45,7 +91,8 @@ export class RedditService {
    * Externally visible.
    */
   async fetchThread(redditUrl: string): Promise<RedditThread> {
-    const postId = this.parsePostId(redditUrl);
+    const resolved = await this._resolveUrl(redditUrl);
+    const postId = this.parsePostId(resolved);
     const apiUrl = `https://old.reddit.com/comments/${postId}.json?limit=${MAX_COMMENTS}&raw_json=1`;
 
     let data: unknown;
