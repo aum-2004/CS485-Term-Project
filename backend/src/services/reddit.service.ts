@@ -1,8 +1,19 @@
 /**
- * RedditService – fetches real thread data from Reddit's public JSON API.
+ * RedditService – fetches real thread data from Reddit's API.
  *
- * No authentication required for public posts.
- * API: https://www.reddit.com/r/{sub}/comments/{id}.json?limit=25&raw_json=1
+ * Uses Reddit's OAuth2 client-credentials flow so requests come from an
+ * authenticated app identity rather than an anonymous cloud IP.  Anonymous
+ * requests from AWS Lambda IPs are blocked by Reddit's Cloudflare layer;
+ * OAuth requests go to oauth.reddit.com which has no such restriction.
+ *
+ * Required environment variables:
+ *   REDDIT_CLIENT_ID     – the "personal use script" app client id
+ *   REDDIT_CLIENT_SECRET – the corresponding client secret
+ *
+ * How to create a Reddit app (free):
+ *   1. Log in to reddit.com → Settings → Safety & Privacy → Manage third-party app authorisation → "create another app…"
+ *   2. Select type "script".
+ *   3. Copy the client ID (shown under the app name) and the secret.
  *
  * Supported URL formats:
  *   https://www.reddit.com/r/science/comments/abc123/title/
@@ -22,8 +33,12 @@ export interface RedditThread {
   comments: RedditComment[];
 }
 
-const USER_AGENT = "Mozilla/5.0 (compatible; CS485DebateAnalyzer/1.0; +https://github.com/aum-2004/CS485-Term-Project)";
+const USER_AGENT = "CS485DebateAnalyzer/1.0 by aum23";
 const MAX_COMMENTS = 25;
+
+/** In-memory OAuth token cache (valid across warm Lambda invocations). */
+let _cachedToken: string | null = null;
+let _tokenExpiresAt = 0; // epoch ms
 
 export class RedditService {
   /**
@@ -46,16 +61,16 @@ export class RedditService {
    */
   async fetchThread(redditUrl: string): Promise<RedditThread> {
     const postId = this.parsePostId(redditUrl);
-    // Use old.reddit.com which is less restrictive on cloud IP ranges
-    const apiUrl = `https://old.reddit.com/comments/${postId}.json?limit=${MAX_COMMENTS}&raw_json=1`;
+    const token = await this._getOAuthToken();
+    const apiUrl = `https://oauth.reddit.com/comments/${postId}.json?limit=${MAX_COMMENTS}&raw_json=1`;
 
     let data: unknown;
     try {
       const res = await fetch(apiUrl, {
         headers: {
+          Authorization: `Bearer ${token}`,
           "User-Agent": USER_AGENT,
           Accept: "application/json",
-          "Accept-Language": "en-US,en;q=0.9",
         },
       });
 
@@ -90,10 +105,15 @@ export class RedditService {
 
   /** Shared fetcher for any subreddit feed (hot / new / rising). */
   private async _fetchSubredditFeed(subreddit: string, feed: string, limit: number): Promise<string[]> {
-    const apiUrl = `https://old.reddit.com/r/${subreddit}/${feed}.json?limit=${limit}&raw_json=1`;
+    const token = await this._getOAuthToken();
+    const apiUrl = `https://oauth.reddit.com/r/${subreddit}/${feed}.json?limit=${limit}&raw_json=1`;
     try {
       const res = await fetch(apiUrl, {
-        headers: { "User-Agent": USER_AGENT, Accept: "application/json", "Accept-Language": "en-US,en;q=0.9" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "User-Agent": USER_AGENT,
+          Accept: "application/json",
+        },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { data: { children: Array<{ data: { id: string; stickied: boolean } }> } };
@@ -104,6 +124,51 @@ export class RedditService {
     } catch (err) {
       throw new Error(`Failed to fetch r/${subreddit} ${feed}: ${(err as Error).message}`);
     }
+  }
+
+  /**
+   * Obtain a Reddit OAuth access token using the client-credentials grant.
+   * Token is cached in memory for its lifetime (~1 hour) so warm Lambda
+   * invocations skip the extra round-trip.
+   */
+  private async _getOAuthToken(): Promise<string> {
+    const now = Date.now();
+    if (_cachedToken && now < _tokenExpiresAt - 60_000) {
+      return _cachedToken;
+    }
+
+    const clientId = process.env.REDDIT_CLIENT_ID;
+    const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      throw new Error(
+        "Reddit OAuth credentials are not configured. " +
+        "Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET in Lambda environment variables."
+      );
+    }
+
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+
+    const res = await fetch("https://www.reddit.com/api/v1/access_token", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": USER_AGENT,
+      },
+      body: "grant_type=client_credentials",
+    });
+
+    if (!res.ok) {
+      throw new Error(
+        `Failed to reach Reddit API: Reddit OAuth token request failed with HTTP ${res.status}`
+      );
+    }
+
+    const json = await res.json() as { access_token: string; expires_in: number };
+    _cachedToken = json.access_token;
+    _tokenExpiresAt = now + json.expires_in * 1000;
+    return _cachedToken;
   }
 
   /** Parse the raw Reddit API response into our domain shape. */
