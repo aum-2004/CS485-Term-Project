@@ -46,26 +46,38 @@ export class ThreadService {
     const POSTS_PER_SUB = 3;  // top 3 per subreddit = up to 18 total
     const CANDIDATES    = 8;  // fetch a few extras to skip comment-less posts
 
-    // Remove stale seeded threads so fresh ones take their place
-    await this._repo.deleteAllSeeded();
-    console.log("[seed] Cleared old seeded threads");
+    // Collect new threads BEFORE wiping old ones.
+    // If Reddit is unreachable (e.g. blocked cloud IP) we keep what's already
+    // in the database so the UI always has something to show.
+    const newThreads: Array<{ url: string; sub: string }> = [];
 
     for (const sub of SUBREDDITS) {
-      let added = 0;
       try {
         const urls = await this._reddit.fetchSubredditHot(sub, CANDIDATES);
-        for (const url of urls) {
-          if (added >= POSTS_PER_SUB) break;
-          try {
-            await this._addRedditThreadAsSeeded(url);
-            console.log(`[seed] Added fresh thread from r/${sub}`);
-            added++;
-          } catch {
-            // comment-less or deleted post – try next candidate
-          }
+        for (const url of urls.slice(0, POSTS_PER_SUB)) {
+          newThreads.push({ url, sub });
         }
       } catch (err) {
         console.warn(`[seed] Could not fetch r/${sub}:`, (err as Error).message);
+      }
+    }
+
+    if (newThreads.length === 0) {
+      // Reddit unreachable – keep whatever is already in the DB
+      console.warn("[seed] Reddit unreachable; keeping existing seeded threads");
+      return;
+    }
+
+    // Only now replace stale threads since we have fresh data
+    await this._repo.deleteAllSeeded();
+    console.log("[seed] Cleared old seeded threads");
+
+    for (const { url, sub } of newThreads) {
+      try {
+        await this._addRedditThreadAsSeeded(url);
+        console.log(`[seed] Added fresh thread from r/${sub}`);
+      } catch {
+        // comment-less or deleted post – skip
       }
     }
   }
