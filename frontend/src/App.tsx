@@ -3,7 +3,7 @@ import ThreadView from "./components/ThreadView";
 import DebateSummaryModal from "./components/DebateSummaryModal";
 import ThreadSelector from "./components/ThreadSelector";
 import WelcomeModal from "./components/WelcomeModal";
-import { refreshAndGetThreads } from "./services/threadService";
+import { getThreads, refreshAndGetThreads } from "./services/threadService";
 import type { Thread } from "./types/Thread";
 
 function App() {
@@ -13,18 +13,31 @@ function App() {
   const [selectedThreadId, setSelectedThreadId] = useState("");
   const [showWelcome, setShowWelcome] = useState(false);
   const [threadsLoading, setThreadsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
+  // On load: just read threads from DB — no Reddit API call
   useEffect(() => {
-    setShowWelcome(true);   // open modal immediately so spinner is visible
+    setShowWelcome(true);
     setThreadsLoading(true);
+    getThreads()
+      .then((data) => {
+        setThreads(data);
+        if (data.length > 0) setSelectedThreadId(data[0].id);
+      })
+      .catch(() => {})
+      .finally(() => setThreadsLoading(false));
+  }, []);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
     refreshAndGetThreads()
       .then((data) => {
         setThreads(data);
         if (data.length > 0) setSelectedThreadId(data[0].id);
       })
-      .catch(() => {/* backend not yet ready */})
-      .finally(() => setThreadsLoading(false));
-  }, []);
+      .catch(() => {})
+      .finally(() => setRefreshing(false));
+  };
 
   const handleThreadAdded = (thread: Thread) => {
     setThreads((prev) =>
@@ -50,6 +63,13 @@ function App() {
         <h1 className="text-lg sm:text-xl font-semibold tracking-wide">
           Reddit AI Debate Analyzer
         </h1>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition"
+        >
+          {refreshing ? "Refreshing…" : "⟳ Refresh Threads"}
+        </button>
       </nav>
 
       {/* Hero */}
