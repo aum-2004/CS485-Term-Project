@@ -53,7 +53,7 @@ export class ThreadService {
 
     for (const sub of SUBREDDITS) {
       try {
-        const urls = await this._reddit.fetchSubredditHot(sub, CANDIDATES);
+        const urls = await this._reddit.fetchSubredditNew(sub, CANDIDATES);
         for (const url of urls.slice(0, POSTS_PER_SUB)) {
           newThreads.push({ url, sub });
         }
