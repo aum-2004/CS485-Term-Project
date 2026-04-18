@@ -26,8 +26,19 @@ export interface RedditThread {
   comments: RedditComment[];
 }
 
-const USER_AGENT = "Mozilla/5.0 (compatible; CS485DebateAnalyzer/1.0; +https://github.com/aum-2004/CS485-Term-Project)";
+const USER_AGENT = "CS485DebateAnalyzer/1.0 by aum23";
 const MAX_COMMENTS = 25;
+
+/**
+ * Build a Reddit API URL, routing through the Cloudflare Worker proxy when
+ * REDDIT_PROXY_URL is set (required on AWS Lambda whose IPs Reddit blocks).
+ * Falls back to direct old.reddit.com when running locally.
+ */
+function redditApiUrl(path: string, query: string): string {
+  const proxyBase = process.env.REDDIT_PROXY_URL?.replace(/\/$/, "");
+  if (proxyBase) return `${proxyBase}${path}?${query}`;
+  return `https://old.reddit.com${path}?${query}`;
+}
 
 export class RedditService {
   /**
@@ -93,16 +104,12 @@ export class RedditService {
   async fetchThread(redditUrl: string): Promise<RedditThread> {
     const resolved = await this._resolveUrl(redditUrl);
     const postId = this.parsePostId(resolved);
-    const apiUrl = `https://old.reddit.com/comments/${postId}.json?limit=${MAX_COMMENTS}&raw_json=1`;
+    const apiUrl = redditApiUrl(`/comments/${postId}.json`, `limit=${MAX_COMMENTS}&raw_json=1`);
 
     let data: unknown;
     try {
       const res = await fetch(apiUrl, {
-        headers: {
-          "User-Agent": USER_AGENT,
-          Accept: "application/json",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       });
 
       if (!res.ok) {
@@ -136,10 +143,10 @@ export class RedditService {
 
   /** Shared fetcher for any subreddit feed (hot / new / rising). */
   private async _fetchSubredditFeed(subreddit: string, feed: string, limit: number): Promise<string[]> {
-    const apiUrl = `https://old.reddit.com/r/${subreddit}/${feed}.json?limit=${limit}&raw_json=1`;
+    const apiUrl = redditApiUrl(`/r/${subreddit}/${feed}.json`, `limit=${limit}&raw_json=1`);
     try {
       const res = await fetch(apiUrl, {
-        headers: { "User-Agent": USER_AGENT, Accept: "application/json", "Accept-Language": "en-US,en;q=0.9" },
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { data: { children: Array<{ data: { id: string; stickied: boolean } }> } };
