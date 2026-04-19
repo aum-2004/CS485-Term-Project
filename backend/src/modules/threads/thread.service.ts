@@ -43,36 +43,34 @@ export class ThreadService {
       "technology", "worldnews", "science",
       "todayilearned", "news", "space",
     ];
-    const POSTS_PER_SUB = 3;  // top 3 per subreddit = up to 18 total
-    const CANDIDATES    = 8;  // fetch a few extras to skip comment-less posts
+    const POSTS_PER_SUB = 3;   // pick 3 per subreddit = up to 18 total
+    const CANDIDATES    = 15;  // fetch 15 so random selection varies every refresh
 
-    // Collect new threads BEFORE wiping old ones.
-    // If Reddit is unreachable (e.g. blocked cloud IP) we keep what's already
-    // in the database so the UI always has something to show.
-    const newThreads: Array<{ url: string; sub: string }> = [];
+    // Collect candidates BEFORE wiping old ones so we never leave the DB empty.
+    const candidatesBySub: Array<{ url: string; sub: string }> = [];
 
     for (const sub of SUBREDDITS) {
       try {
         const urls = await this._reddit.fetchSubredditNew(sub, CANDIDATES);
-        for (const url of urls.slice(0, POSTS_PER_SUB)) {
-          newThreads.push({ url, sub });
+        // Shuffle so each refresh picks a different subset even seconds apart
+        const shuffled = urls.sort(() => Math.random() - 0.5);
+        for (const url of shuffled.slice(0, POSTS_PER_SUB)) {
+          candidatesBySub.push({ url, sub });
         }
       } catch (err) {
         console.warn(`[seed] Could not fetch r/${sub}:`, (err as Error).message);
       }
     }
 
-    if (newThreads.length === 0) {
-      // Reddit unreachable – keep whatever is already in the DB
+    if (candidatesBySub.length === 0) {
       console.warn("[seed] Reddit unreachable; keeping existing seeded threads");
       return;
     }
 
-    // Only now replace stale threads since we have fresh data
     await this._repo.deleteAllSeeded();
     console.log("[seed] Cleared old seeded threads");
 
-    for (const { url, sub } of newThreads) {
+    for (const { url, sub } of candidatesBySub) {
       try {
         await this._addRedditThreadAsSeeded(url);
         console.log(`[seed] Added fresh thread from r/${sub}`);
