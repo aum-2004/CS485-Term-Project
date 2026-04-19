@@ -3,7 +3,7 @@ import ThreadView from "./components/ThreadView";
 import DebateSummaryModal from "./components/DebateSummaryModal";
 import ThreadSelector from "./components/ThreadSelector";
 import WelcomeModal from "./components/WelcomeModal";
-import { getThreads, refreshAndGetThreads } from "./services/threadService";
+import { refreshAndGetThreads } from "./services/threadService";
 import type { Thread } from "./types/Thread";
 
 function App() {
@@ -15,11 +15,11 @@ function App() {
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // On load: just read threads from DB — no Reddit API call
+  // On load: fetch fresh Reddit threads via Cloudflare Worker proxy
   useEffect(() => {
     setShowWelcome(true);
     setThreadsLoading(true);
-    getThreads()
+    refreshAndGetThreads()
       .then((data) => {
         setThreads(data);
         if (data.length > 0) setSelectedThreadId(data[0].id);
