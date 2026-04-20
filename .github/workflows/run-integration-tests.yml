@@ -12,7 +12,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://debate_user:debate_pass@localhost:5432/debate_analyzer
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       REDIS_URL: redis://localhost:6379
       CORS_ORIGIN: http://localhost:5173
 

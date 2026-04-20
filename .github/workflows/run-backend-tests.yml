@@ -15,7 +15,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://debate_user:debate_pass@localhost:5432/debate_analyzer
-      GEMINI_API_KEY: placeholder-not-needed-tests-mock-ai
+      ANTHROPIC_API_KEY: placeholder-not-needed-tests-mock-ai
       REDIS_URL: redis://localhost:6379
 
     services:

@@ -14,22 +14,18 @@ import { CommentService } from "../src/modules/comments/comment.service";
 import { AIService } from "../src/modules/ai/ai.service";
 import type { Comment } from "../src/modules/comments/comment.types";
 
-// ── Mock Gemini so tests never hit the real API ─────────────────────────────
-jest.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-    getGenerativeModel: jest.fn().mockReturnValue({
-      generateContent: jest.fn().mockImplementation((prompt: string) => {
-        const score = prompt.length > 500 ? 80 : 30;
-        return Promise.resolve({
-          response: {
-            text: () =>
-              `[{"index":0,"reasoningScore":${score},"summary":"Well-reasoned argument."}]`,
-          },
-        });
-      }),
-    }),
-  })),
-}));
+// ── Mock Anthropic so tests never hit the real API ──────────────────────────
+jest.mock("@anthropic-ai/sdk", () => {
+  const mockCreate = jest.fn().mockImplementation((params: { messages: Array<{ content: string }> }) => {
+    const prompt = params.messages?.[0]?.content ?? "";
+    const score = prompt.length > 500 ? 80 : 30;
+    return Promise.resolve({
+      content: [{ type: "text", text: `[{"index":0,"reasoningScore":${score},"summary":"Well-reasoned argument."}]` }],
+    });
+  });
+  const MockAnthropic = jest.fn().mockImplementation(() => ({ messages: { create: mockCreate } }));
+  return { __esModule: true, default: MockAnthropic };
+});
 
 // ── Comment fixtures ────────────────────────────────────────────────────────
 const unanalysedComment: Comment = {
@@ -134,13 +130,19 @@ describe("CommentService – User Story A", () => {
     );
   });
 
-  it("does NOT cache when there are unanalysed comments (avoids caching partial data)", async () => {
+  it("caches the re-fetched fully-analysed comments after background analysis completes", async () => {
     const { redis } = await import("../src/config/redis");
     mockRepo.findByThreadId.mockResolvedValueOnce([unanalysedComment]);
+    // second findByThreadId (re-fetch after analysis) returns analysed data
+    mockRepo.findByThreadId.mockResolvedValueOnce([analysedComment]);
 
     await service.getEnrichedComments("t1");
 
-    expect(redis.setex).not.toHaveBeenCalled();
+    expect(redis.setex).toHaveBeenCalledWith(
+      "thread:t1:comments",
+      300,
+      expect.any(String)
+    );
   });
 
   it("uses correct cache key format thread:{threadId}:comments", async () => {
@@ -240,13 +242,11 @@ describe("AIService – comment analysis", () => {
   });
 
   it("clamps score to exactly 100 when AI returns a value above 100", async () => {
-    // Override generateContent on the existing mock instance to return out-of-range score
-    const { GoogleGenerativeAI } = require("@google/generative-ai");
-    const mockInstance = (GoogleGenerativeAI as jest.Mock).mock.results[0]?.value;
-    const mockModel = mockInstance?.getGenerativeModel?.mock?.results[0]?.value;
-    if (mockModel?.generateContent) {
-      (mockModel.generateContent as jest.Mock).mockResolvedValueOnce({
-        response: { text: () => '[{"index":0,"reasoningScore":150,"summary":"Great."}]' },
+    const Anthropic = require("@anthropic-ai/sdk").default;
+    const mockInstance = (Anthropic as jest.Mock).mock.results[0]?.value;
+    if (mockInstance?.messages?.create) {
+      (mockInstance.messages.create as jest.Mock).mockResolvedValueOnce({
+        content: [{ type: "text", text: '[{"index":0,"reasoningScore":150,"summary":"Great."}]' }],
       });
     }
     const result = await ai.analyseComment("test");
@@ -254,12 +254,11 @@ describe("AIService – comment analysis", () => {
   });
 
   it("clamps score to at least 0 when AI returns a negative value", async () => {
-    const { GoogleGenerativeAI } = require("@google/generative-ai");
-    const mockInstance = (GoogleGenerativeAI as jest.Mock).mock.results[0]?.value;
-    const mockModel = mockInstance?.getGenerativeModel?.mock?.results[0]?.value;
-    if (mockModel?.generateContent) {
-      (mockModel.generateContent as jest.Mock).mockResolvedValueOnce({
-        response: { text: () => '[{"index":0,"reasoningScore":-20,"summary":"Poor."}]' },
+    const Anthropic = require("@anthropic-ai/sdk").default;
+    const mockInstance = (Anthropic as jest.Mock).mock.results[0]?.value;
+    if (mockInstance?.messages?.create) {
+      (mockInstance.messages.create as jest.Mock).mockResolvedValueOnce({
+        content: [{ type: "text", text: '[{"index":0,"reasoningScore":-20,"summary":"Poor."}]' }],
       });
     }
     const result = await ai.analyseComment("test");

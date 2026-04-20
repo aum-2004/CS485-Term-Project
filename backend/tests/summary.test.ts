@@ -16,19 +16,20 @@ import { AIService } from "../src/modules/ai/ai.service";
 import type { DebateSummary } from "../src/modules/summary/summary.types";
 import type { Comment } from "../src/modules/comments/comment.types";
 
-// ── Mock Gemini so tests never hit the real API ─────────────────────────────
-jest.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-    getGenerativeModel: jest.fn().mockReturnValue({
-      generateContent: jest.fn().mockResolvedValue({
-        response: {
-          text: () =>
-            '{"mainPositions":["Position A","Position B"],"supportingEvidence":["Evidence 1"],"areasOfDisagreement":["Disagreement 1"]}',
-        },
+// ── Mock Anthropic so tests never hit the real API ──────────────────────────
+jest.mock("@anthropic-ai/sdk", () => {
+  const MockAnthropic = jest.fn().mockImplementation(() => ({
+    messages: {
+      create: jest.fn().mockResolvedValue({
+        content: [{
+          type: "text",
+          text: '{"mainPositions":["Position A","Position B"],"supportingEvidence":["Evidence 1"],"areasOfDisagreement":["Disagreement 1"]}',
+        }],
       }),
-    }),
-  })),
-}));
+    },
+  }));
+  return { __esModule: true, default: MockAnthropic };
+});
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 const mockSummary: DebateSummary = {
@@ -229,7 +230,7 @@ describe("SummaryService – User Story B", () => {
     // Spy directly on AIService so we bypass the module-level singleton
     const ai = new AIService();
     jest.spyOn(ai, "generateDebateSummary").mockRejectedValueOnce(
-      new Error("Gemini down — not a quota error")
+      new Error("Claude down — not a quota error")
     );
     const failingService = new SummaryService(
       mockSummaryRepo as never,

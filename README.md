@@ -2,7 +2,7 @@
 
 CS485 Term Project — Aryan Modi (aum23)
 
-A full-stack web app that fetches Reddit threads and uses Google Gemini to score each comment's reasoning quality (0–100) and generate a structured debate summary.
+A full-stack web app that fetches Reddit threads and uses Claude AI (Anthropic) to score each comment's reasoning quality (0–100) and generate a structured debate summary.
 
 ---
 
@@ -11,7 +11,7 @@ A full-stack web app that fetches Reddit threads and uses Google Gemini to score
 ### Prerequisites
 - Node.js ≥ 18
 - PostgreSQL 16 (Homebrew: `brew install postgresql@16`)
-- Google Gemini API key
+- Anthropic API key (Claude)
 
 ### Start PostgreSQL
 ```bash
@@ -22,7 +22,7 @@ brew services start postgresql@16
 ```bash
 cd backend
 npm install
-cp .env.example .env    # add your GEMINI_API_KEY
+cp .env.example .env    # add your ANTHROPIC_API_KEY
 npm run db:setup        # first time only
 npm run dev             # http://localhost:3001
 ```
@@ -72,7 +72,7 @@ npm run test:coverage
 ```
 
 Tests are in `backend/tests/` and use [Jest](https://jestjs.io/) + [ts-jest](https://kulshekhar.github.io/ts-jest/).
-All PostgreSQL, Redis, and Gemini API calls are mocked.
+All PostgreSQL, Redis, and Anthropic API calls are mocked.
 
 ---
 
@@ -148,7 +148,7 @@ zip -r lambda.zip node_modules
 6. Set **Configuration → Environment variables**:
    - `NODE_ENV` = `production`
    - `DATABASE_URL` = your Neon connection string
-   - `GEMINI_API_KEY` = your Gemini API key
+   - `ANTHROPIC_API_KEY` = your Anthropic API key
    - `CORS_ORIGIN` = your Amplify frontend URL
 
 ### 4. Create API Gateway (REST API)
@@ -176,7 +176,7 @@ In your GitHub repo Settings → Secrets and variables → Actions, add:
 | `LAMBDA_FUNCTION_NAME` | e.g. `debate-analyzer-backend` |
 | `AMPLIFY_APP_ID` | From Amplify console (e.g. `d1abc123xyz`) |
 | `VITE_API_URL` | API Gateway invoke URL |
-| `GEMINI_API_KEY` | Google Gemini API key |
+| `ANTHROPIC_API_KEY` | Anthropic (Claude) API key |
 
 ---
 
