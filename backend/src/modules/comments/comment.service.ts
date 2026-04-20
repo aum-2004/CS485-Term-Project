@@ -74,23 +74,31 @@ export class CommentService {
     // 2. Fetch from DB immediately (some may have null scores – that's fine)
     const comments = await this._repo.findByThreadId(threadId);
 
-    // 3. Fire background analysis for any un-scored comments (non-blocking)
+    // 3. Run AI analysis for any un-scored comments.
+    // Must be awaited (not fire-and-forget) — Lambda freezes the process
+    // the moment a response is sent, so background tasks never complete.
     const hasUnanalysed = comments.some((c) => !c.analyzedAt);
     if (hasUnanalysed) {
-      void this._analyseNewComments(threadId).catch((err) => {
+      try {
+        await this._analyseNewComments(threadId);
+      } catch (err) {
         console.warn(
-          "[CommentService] Background AI analysis failed:",
+          "[CommentService] AI analysis failed:",
           (err as Error).message.substring(0, 150),
         );
-      });
-    } else {
-      // 4. All analysed – safe to cache
-      try {
-        await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(comments));
-      } catch {
-        // Non-fatal – proceed without cache
       }
+      // Re-fetch so the response includes the freshly saved scores
+      const analysed = await this._repo.findByThreadId(threadId);
+      try {
+        await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(analysed));
+      } catch { /* non-fatal */ }
+      return analysed;
     }
+
+    // 4. All analysed – safe to cache
+    try {
+      await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(comments));
+    } catch { /* non-fatal */ }
 
     return comments;
   }
