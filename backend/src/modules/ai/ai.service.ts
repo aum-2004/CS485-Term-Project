@@ -1,14 +1,14 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Anthropic from "@anthropic-ai/sdk";
 import type { CommentAnalysis, DebateSummaryData } from "./ai.types";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY ?? "" });
+const MODEL = "claude-haiku-4-5-20251001";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Extract the first JSON value (object or array) from a Gemini response. */
+/** Extract the first JSON value (object or array) from a Claude response. */
 function extractJson(text: string): unknown {
   const stripped = text
     .replace(/^```(?:json)?\s*/im, "")
@@ -20,28 +20,22 @@ function extractJson(text: string): unknown {
 }
 
 /**
- * Retry up to maxRetries times on 429 per-minute rate-limit errors.
- * Daily quota exhaustion (quotaId contains "PerDay") is not retried — fail fast.
- * Waits 65 s on first retry (clears the 1-min RPM window), 90 s on second.
+ * Retry up to maxRetries times on 429 rate-limit errors.
+ * Waits 65 s on first retry, 90 s on second.
  */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
-  const delays = [65_000, 90_000]; // 65 s clears 1-min RPM window; 90 s for safety
+  const delays = [65_000, 90_000];
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
     } catch (err) {
       const msg = (err as Error).message ?? "";
-      const isRateLimit = msg.includes("429") || msg.toLowerCase().includes("quota");
-      // Daily quota exhaustion cannot be cleared by waiting — fail immediately
-      const isDailyQuota = msg.toLowerCase().includes("perday");
-      if (isRateLimit && !isDailyQuota && attempt < maxRetries) {
+      const isRateLimit = msg.includes("429") || msg.toLowerCase().includes("rate_limit");
+      if (isRateLimit && attempt < maxRetries) {
         const waitMs = delays[attempt - 1] ?? 65_000;
         console.warn(`[AI] Rate limit – retrying in ${waitMs / 1000}s (attempt ${attempt}/${maxRetries})`);
         await new Promise((r) => setTimeout(r, waitMs));
       } else {
-        if (isDailyQuota) {
-          console.warn("[AI] Daily quota exhausted – analysis will retry automatically when quota resets.");
-        }
         throw err;
       }
     }
@@ -55,9 +49,8 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
 
 export class AIService {
   /**
-   * Analyse a BATCH of comments in a single Gemini API call.
+   * Analyse a BATCH of comments in a single Claude API call.
    * Returns one CommentAnalysis per input comment (same order).
-   * THROWS on failure so callers can decide whether to store the result.
    * Externally visible.
    */
   async analyseComments(contents: string[]): Promise<CommentAnalysis[]> {
@@ -78,12 +71,17 @@ Return ONLY a JSON array:
 reasoningScore: 0=incoherent, 50=average, 100=exceptional logic+evidence.`;
 
     const parsed = await withRetry(async () => {
-      const result = await model.generateContent(prompt);
-      return extractJson(result.response.text());
+      const message = await client.messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const text = message.content[0].type === "text" ? message.content[0].text : "";
+      return extractJson(text);
     });
 
     const arr = parsed as Array<{ index: number; reasoningScore: unknown; summary: unknown }>;
-    if (!Array.isArray(arr)) throw new Error("Expected JSON array from Gemini");
+    if (!Array.isArray(arr)) throw new Error("Expected JSON array from Claude");
 
     return contents.map((_, i) => {
       const item = arr.find((x) => Number(x.index) === i);
@@ -126,10 +124,14 @@ JSON format (use these exact keys):
 
 Base every item specifically on the actual comment content above.`;
 
-    // Let errors propagate — callers must NOT persist failed results
     const parsed = await withRetry(async () => {
-      const result = await model.generateContent(prompt);
-      return extractJson(result.response.text());
+      const message = await client.messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const text = message.content[0].type === "text" ? message.content[0].text : "";
+      return extractJson(text);
     });
 
     const data = parsed as Partial<DebateSummaryData>;

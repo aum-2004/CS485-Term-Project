@@ -16,6 +16,7 @@
     "build:lambda": "tsc && cd dist && zip -r ../lambda.zip . && cd .. && zip -r lambda.zip node_modules"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@google/generative-ai": "^0.24.1",
     "@vendia/serverless-express": "^4.12.6",
     "cors": "^2.8.5",
